@@ -383,15 +383,18 @@ function startClock() {
 // ── API ──────────────────────────────────────────────────────
 async function api(data) {
   try {
-    const r = await fetch(API_URL, {
-      method:"POST", mode:"cors",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify(data)
+    const params = new URLSearchParams();
+    Object.entries(data).forEach(([k, v]) => {
+      params.append(k, typeof v === "object" ? JSON.stringify(v) : v);
     });
-    return await r.json();
+    const url = API_URL + "?" + params.toString();
+    const r = await fetch(url, { method:"GET", redirect:"follow" });
+    const text = await r.text();
+    try { return JSON.parse(text); }
+    catch(e2) { return { ok: false, error: "Respuesta invalida: " + text.substring(0,100) }; }
   } catch(e) {
     console.warn("API error:", e);
-    return { ok: false, error: "Sin conexión — modo demo activo" };
+    return { ok: false, error: "Sin conexion: " + e.message };
   }
 }
 
