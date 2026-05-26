@@ -262,6 +262,12 @@ tr:hover td { background: rgba(45,125,210,.05); }
   #content { padding: 16px; }
 }
 
+/* ── NOTIFICACION BANNER ── */
+@keyframes slideIn {
+  from { transform: translateX(120%); opacity:0; }
+  to   { transform: translateX(0);    opacity:1; }
+}
+
 /* ── MISC ── */
 .sep { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .text-muted { color: var(--text2); font-size: 13px; }
@@ -373,6 +379,188 @@ function startClock() {
   tick(); setInterval(tick, 10000);
 }
 
+// ── SISTEMA DE NOTIFICACIONES ────────────────────────────────
+let notif_lastKnownIds = new Set();
+let notif_initialized = false;
+let notif_swRegistered = false;
+
+function initNotifications() {
+  if (notif_initialized) return;
+  notif_initialized = true;
+
+  // Pedir permiso de notificaciones del navegador
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission().then(perm => {
+      if (perm === "granted") registrarServiceWorker();
+    });
+  } else if ("Notification" in window && Notification.permission === "granted") {
+    registrarServiceWorker();
+  }
+
+  // Polling cada 30 segundos — detecta pedidos nuevos mientras la app está abierta
+  setInterval(checkNuevosPedidos, 30000);
+  // Primera verificación a los 5 segundos de iniciar
+  setTimeout(checkNuevosPedidos, 5000);
+}
+
+async function checkNuevosPedidos() {
+  // Solo verificar si el usuario es operario o supervisor
+  if (!state.role || state.role === "servicio" || state.role === "director") return;
+
+  const data = await api({ action:"getPedidos" });
+  if (!Array.isArray(data)) return;
+
+  const pendientes = data.filter(p => p.Estado === "Pendiente");
+
+  if (!notif_initialized) return;
+
+  // Primera carga — solo registrar IDs sin alertar
+  if (notif_lastKnownIds.size === 0 && pendientes.length > 0) {
+    pendientes.forEach(p => notif_lastKnownIds.add(p.ID));
+    actualizarBadge(pendientes.length);
+    return;
+  }
+
+  // Detectar pedidos nuevos que no estaban antes
+  const nuevos = pendientes.filter(p => !notif_lastKnownIds.has(p.ID));
+  pendientes.forEach(p => notif_lastKnownIds.add(p.ID));
+  actualizarBadge(pendientes.length);
+
+  if (nuevos.length === 0) return;
+
+  // Hay pedidos nuevos — alertar
+  nuevos.forEach(p => {
+    const msg = `Nuevo pedido de ${p.Servicio || "un servicio"}: ${(p.Descripcion || "").substring(0, 60)}`;
+    reproducirSonido(p.Urgencia === "Alta");
+    mostrarNotificacionVisual(msg, p.Urgencia);
+    enviarNotificacionPush(msg, p.Urgencia);
+  });
+
+  // Actualizar badge
+  const badge = document.getElementById("badge-pedidos");
+  if (badge) badge.textContent = pendientes.length;
+}
+
+function actualizarBadge(cantidad) {
+  const badge = document.getElementById("badge-pedidos");
+  if (badge) badge.textContent = cantidad > 0 ? cantidad : "0";
+  // Badge en pestaña del navegador
+  if (cantidad > 0) {
+    document.title = `(${cantidad}) Mantenimiento — Sanatorio`;
+  } else {
+    document.title = "Mantenimiento — Sanatorio";
+  }
+}
+
+function reproducirSonido(urgente) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const beeps = urgente ? 3 : 1;
+    for (let i = 0; i < beeps; i++) {
+      setTimeout(() => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = urgente ? 880 : 660;
+        osc.type = "sine";
+        gain.gain.setValueAtTime(0.4, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.4);
+      }, i * 500);
+    }
+  } catch(e) {
+    console.warn("Audio error:", e);
+  }
+}
+
+function mostrarNotificacionVisual(mensaje, urgencia) {
+  // Eliminar notificación anterior si existe
+  const anterior = document.getElementById("notif-banner");
+  if (anterior) anterior.remove();
+
+  const banner = document.createElement("div");
+  banner.id = "notif-banner";
+  banner.style.cssText = `
+    position:fixed; top:60px; right:16px; z-index:999;
+    background:${urgencia==="Alta"?"#e74c3c":"#2d7dd2"};
+    color:#fff; padding:14px 18px; border-radius:8px;
+    box-shadow:0 4px 20px rgba(0,0,0,.4);
+    max-width:320px; font-size:13px; line-height:1.4;
+    cursor:pointer; animation: slideIn .3s ease;
+  `;
+  banner.innerHTML = `
+    <div style="font-weight:600;margin-bottom:4px">
+      ${urgencia==="Alta"?"🔴":"🔔"} Nuevo pedido${urgencia==="Alta"?" — URGENTE":""}
+    </div>
+    <div>${mensaje}</div>
+    <div style="font-size:11px;margin-top:6px;opacity:.8">Tocá para ver la cola de pedidos</div>
+  `;
+  banner.onclick = () => { banner.remove(); navigate("cola"); };
+  document.body.appendChild(banner);
+
+  // Auto-cerrar después de 10 segundos (urgentes no se cierran solos)
+  if (urgencia !== "Alta") {
+    setTimeout(() => { if (banner.parentNode) banner.remove(); }, 10000);
+  }
+}
+
+function enviarNotificacionPush(mensaje, urgencia) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  try {
+    const n = new Notification("🏥 Mantenimiento — Nuevo pedido", {
+      body: mensaje,
+      icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏥</text></svg>",
+      badge: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔔</text></svg>",
+      tag: "pedido-nuevo",
+      requireInteraction: urgencia === "Alta",
+      vibrate: urgencia === "Alta" ? [200,100,200,100,200] : [200],
+    });
+    n.onclick = () => { window.focus(); navigate("cola"); n.close(); };
+  } catch(e) {
+    console.warn("Push notification error:", e);
+  }
+}
+
+// Service Worker para notificaciones con app cerrada
+function registrarServiceWorker() {
+  if (notif_swRegistered || !("serviceWorker" in navigator)) return;
+  notif_swRegistered = true;
+
+  const swCode = `
+    self.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'NOTIFY') {
+        self.registration.showNotification(e.data.title, {
+          body: e.data.body,
+          icon: e.data.icon || '',
+          tag: 'pedido-nuevo',
+          requireInteraction: e.data.urgente || false,
+          vibrate: e.data.urgente ? [200,100,200,100,200] : [200],
+          data: { url: e.data.url || '/' }
+        });
+      }
+    });
+    self.addEventListener('notificationclick', (e) => {
+      e.notification.close();
+      e.waitUntil(clients.openWindow(e.notification.data.url || '/'));
+    });
+    // Polling en background cada 60 segundos
+    self.addEventListener('periodicsync', () => {});
+  `;
+
+  const blob = new Blob([swCode], { type:"application/javascript" });
+  const swUrl = URL.createObjectURL(blob);
+
+  navigator.serviceWorker.register(swUrl, { scope:"/" })
+    .then(reg => {
+      console.log("Service Worker registrado");
+      // Guardar registro para enviar mensajes desde la app
+      window._swReg = reg;
+    })
+    .catch(e => console.warn("SW error:", e));
+}
+
 // ── API ──────────────────────────────────────────────────────
 function api(data) {
   return new Promise((resolve) => {
@@ -461,6 +649,10 @@ function launchApp() {
   document.getElementById("user-role-display").textContent = roleLabel(state.role);
   buildNav();
   startClock();
+  // Iniciar notificaciones solo para operarios y supervisores
+  if (state.role === "operario" || state.role === "supervisor") {
+    initNotifications();
+  }
   navigate("dashboard");
 }
 
