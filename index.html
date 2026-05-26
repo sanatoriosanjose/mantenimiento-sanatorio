@@ -692,7 +692,7 @@ function buildNav() {
         { id:"ronda", icon:"🚶", label:"Realizar ronda" },
         { id:"trabajo_propio", icon:"🔨", label:"Trabajo propio" },
         { id:"novedades", icon:"📝", label:"Novedades de turno" },
-        { id:"requerimientos_personal", icon:"👤", label:"Mis solicitudes" },
+
       ]
     });
   }
@@ -702,6 +702,7 @@ function buildNav() {
       label: "Supervisión",
       items: [
         { id:"pedido_supervisor", icon:"➕", label:"Crear pedido de trabajo" },
+        { id:"tablero_supervisor", icon:"📌", label:"Tablero de novedades" },
         { id:"personal", icon:"👥", label:"Nómina personal" },
         { id:"req_personal_admin", icon:"📅", label:"Solicitudes del personal" },
         { id:"proveedores", icon:"📞", label:"Proveedores" },
@@ -751,6 +752,7 @@ function navigate(page) {
     obleas:"Obleas y vencimientos", servicios_admin:"Gestión de servicios / PINs",
     req_personal_admin:"Solicitudes del personal", requerimientos_personal:"Mis solicitudes",
     pedido_supervisor:"Crear pedido de trabajo",
+    tablero_supervisor:"Tablero de novedades del jefe",
   };
   document.getElementById("topbar-title").textContent = titles[page] || page;
 
@@ -769,6 +771,7 @@ function navigate(page) {
     req_personal_admin: renderReqPersonalAdmin,
     requerimientos_personal: renderRequerimientosPersonal,
     pedido_supervisor: renderPedidoSupervisor,
+    tablero_supervisor: renderTableroSupervisor,
   };
   if (pages[page]) pages[page]();
 }
@@ -791,6 +794,105 @@ function showAlert(type, msg, container="content") {
   el.className = `alert alert-${type}`; el.textContent = msg;
   const c = document.getElementById(container) || document.getElementById("content");
   c.prepend(el); setTimeout(() => el.remove(), 4000);
+}
+
+// ── TABLERO SUPERVISOR ───────────────────────────────────────
+async function renderTableroSupervisor() {
+  document.getElementById("content").innerHTML = `
+    <div class="section-header">
+      <div><div class="section-title">Tablero de novedades</div>
+      <div class="section-sub">Lo que publiques acá lo ven todos los operarios al entrar</div></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">📌 Publicar novedad</div>
+        <div id="tablero-msg"></div>
+        <div class="form-group">
+          <label class="form-label">Tipo</label>
+          <select id="tb-tipo">
+            <option value="Instrucción">📋 Instrucción</option>
+            <option value="Alerta">🔴 Alerta</option>
+            <option value="Información">ℹ️ Información</option>
+            <option value="Recordatorio">🔔 Recordatorio</option>
+            <option value="Urgente">🚨 Urgente</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mensaje *</label>
+          <textarea id="tb-texto" rows="4" placeholder="Escribir la novedad, instrucción o alerta para el personal..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Vigente hasta (opcional)</label>
+          <input id="tb-hasta" type="date">
+          <div style="font-size:11px;color:var(--text2);margin-top:3px">Si no ponés fecha, queda visible indefinidamente hasta que la archivés.</div>
+        </div>
+        <button class="btn btn-primary" onclick="publicarTablero()">📌 Publicar</button>
+      </div>
+      <div class="card" id="tablero-lista">
+        <div class="card-title">Novedades publicadas</div>
+        <div class="text-muted">Cargando...</div>
+      </div>
+    </div>`;
+  cargarTablero();
+}
+
+async function publicarTablero() {
+  const texto = document.getElementById("tb-texto").value.trim();
+  if (!texto) { mostrarMsgTablero("warning","⚠ Escribir el mensaje antes de publicar."); return; }
+  const btn = document.querySelector("button[onclick='publicarTablero()']");
+  if (btn) { btn.disabled = true; btn.textContent = "Publicando..."; }
+  const res = await api({
+    action: "nuevaNovedad",
+    turno: "Supervisor",
+    operario: state.nombre,
+    novedad: texto,
+    tipo: document.getElementById("tb-tipo").value + (document.getElementById("tb-hasta").value ? " · Vigente hasta: " + document.getElementById("tb-hasta").value : ""),
+  });
+  if (btn) { btn.disabled = false; btn.innerHTML = "📌 Publicar"; }
+  if (res && res.ok !== false) {
+    mostrarMsgTablero("success","✓ Novedad publicada — el personal la verá al abrir la app.");
+    document.getElementById("tb-texto").value = "";
+    document.getElementById("tb-hasta").value = "";
+    cargarTablero();
+  } else {
+    mostrarMsgTablero("danger","✗ Error: " + (res?.error || "verificar conexión"));
+  }
+}
+
+function mostrarMsgTablero(tipo, texto) {
+  const el = document.getElementById("tablero-msg");
+  if (!el) return;
+  el.innerHTML = `<div class="alert alert-${tipo}">${texto}</div>`;
+  if (tipo === "success") setTimeout(() => { el.innerHTML = ""; }, 4000);
+}
+
+async function cargarTablero() {
+  const lista = document.getElementById("tablero-lista");
+  if (!lista) return;
+  const data = await api({ action:"getNovedades" });
+  const items = Array.isArray(data)
+    ? data.filter(n => n.Turno === "Supervisor").reverse()
+    : [];
+
+  const iconos = { "Instrucción":"📋","Alerta":"🔴","Información":"ℹ️","Recordatorio":"🔔","Urgente":"🚨" };
+
+  lista.innerHTML = `<div class="card-title">Novedades publicadas</div>` +
+    (items.length === 0
+      ? `<div class="text-muted">No hay novedades publicadas aún.</div>`
+      : items.map(n => {
+          const tipo = (n.Tipo||"").split(" ·")[0];
+          const icono = iconos[tipo] || "📌";
+          const vigencia = (n.Tipo||"").includes("Vigente hasta") ? n.Tipo.split("Vigente hasta:")[1]?.trim() : null;
+          return `
+            <div style="padding:10px 0;border-bottom:1px solid rgba(45,125,210,.08)">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <span style="font-size:12px;font-weight:600;color:var(--cyan)">${icono} ${tipo}</span>
+                <span style="font-size:11px;color:var(--text3)">${n.Fecha||""} ${n.Hora||""}</span>
+              </div>
+              <div style="font-size:13px;margin-bottom:3px">${n.Novedad||""}</div>
+              ${vigencia ? `<div style="font-size:11px;color:var(--amber)">⏳ Vigente hasta: ${vigencia}</div>` : ""}
+            </div>`;
+        }).join(""));
 }
 
 // ── PEDIDO SUPERVISOR ────────────────────────────────────────
@@ -948,15 +1050,33 @@ async function renderDashboard() {
       rondasHoy:18 });
   }
 
-  // Novedades recientes
-  if (novedades && Array.isArray(novedades) && novedades.length > 0) {
+  // Novedades del supervisor (tablero) — se muestran primero y destacadas
+  if (novedades && Array.isArray(novedades)) {
     const strip = document.getElementById("novedades-strip");
-    const items = novedades.slice(-3).reverse();
-    strip.innerHTML = `
-      <div class="novedad-strip">
-        <div class="novedad-strip-title">📝 Últimas novedades registradas</div>
-        ${items.map(n=>`<div class="novedad-row">• [${n.Turno||''}] ${n.Operario||''}: ${n.Novedad||''}</div>`).join("")}
+    const deSuper = novedades.filter(n => n.Turno === "Supervisor").slice(-3).reverse();
+    const deOperarios = novedades.filter(n => n.Turno !== "Supervisor").slice(-3).reverse();
+    let html = "";
+
+    if (deSuper.length > 0) {
+      const iconos = {"Instrucción":"📋","Alerta":"🔴","Información":"ℹ️","Recordatorio":"🔔","Urgente":"🚨"};
+      html += `<div class="novedad-strip" style="border-color:rgba(15,184,201,.4);background:rgba(15,184,201,.06);margin-bottom:10px">
+        <div class="novedad-strip-title" style="color:var(--cyan)">📌 Novedades del jefe de mantenimiento</div>
+        ${deSuper.map(n=>{
+          const tipo = (n.Tipo||"").split(" ·")[0];
+          const icono = iconos[tipo] || "📌";
+          return `<div class="novedad-row" style="color:var(--text);padding:4px 0">${icono} <strong>${n.Fecha||""}</strong>: ${n.Novedad||""}</div>`;
+        }).join("")}
       </div>`;
+    }
+
+    if (deOperarios.length > 0) {
+      html += `<div class="novedad-strip">
+        <div class="novedad-strip-title">📝 Últimas novedades de turno</div>
+        ${deOperarios.map(n=>`<div class="novedad-row">• [${n.Turno||''}] ${n.Operario||''}: ${n.Novedad||''}</div>`).join("")}
+      </div>`;
+    }
+
+    if (html) strip.innerHTML = html;
   }
 }
 
