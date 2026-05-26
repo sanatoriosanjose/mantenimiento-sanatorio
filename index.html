@@ -692,7 +692,7 @@ function buildNav() {
         { id:"ronda", icon:"🚶", label:"Realizar ronda" },
         { id:"trabajo_propio", icon:"🔨", label:"Trabajo propio" },
         { id:"novedades", icon:"📝", label:"Novedades de turno" },
-        { id:"requerimientos_personal", icon:"👤", label:"Mis requerimientos" },
+        { id:"requerimientos_personal", icon:"👤", label:"Mis solicitudes" },
       ]
     });
   }
@@ -701,8 +701,9 @@ function buildNav() {
     sections.push({
       label: "Supervisión",
       items: [
+        { id:"pedido_supervisor", icon:"➕", label:"Crear pedido de trabajo" },
         { id:"personal", icon:"👥", label:"Nómina personal" },
-        { id:"req_personal_admin", icon:"📅", label:"Requerimientos" },
+        { id:"req_personal_admin", icon:"📅", label:"Solicitudes del personal" },
         { id:"proveedores", icon:"📞", label:"Proveedores" },
         { id:"obleas", icon:"🏷", label:"Obleas / venc." },
         { id:"servicios_admin", icon:"🔑", label:"Servicios / PINs" },
@@ -748,7 +749,8 @@ function navigate(page) {
     mis_pedidos:"Mis pedidos", ronda:"Registro de ronda", trabajo_propio:"Trabajo propio",
     novedades:"Novedades de turno", personal:"Nómina del personal", proveedores:"Proveedores y servicios",
     obleas:"Obleas y vencimientos", servicios_admin:"Gestión de servicios / PINs",
-    req_personal_admin:"Requerimientos del personal", requerimientos_personal:"Mis requerimientos",
+    req_personal_admin:"Solicitudes del personal", requerimientos_personal:"Mis solicitudes",
+    pedido_supervisor:"Crear pedido de trabajo",
   };
   document.getElementById("topbar-title").textContent = titles[page] || page;
 
@@ -766,6 +768,7 @@ function navigate(page) {
     servicios_admin: renderServiciosAdmin,
     req_personal_admin: renderReqPersonalAdmin,
     requerimientos_personal: renderRequerimientosPersonal,
+    pedido_supervisor: renderPedidoSupervisor,
   };
   if (pages[page]) pages[page]();
 }
@@ -788,6 +791,123 @@ function showAlert(type, msg, container="content") {
   el.className = `alert alert-${type}`; el.textContent = msg;
   const c = document.getElementById(container) || document.getElementById("content");
   c.prepend(el); setTimeout(() => el.remove(), 4000);
+}
+
+// ── PEDIDO SUPERVISOR ────────────────────────────────────────
+async function renderPedidoSupervisor() {
+  // Cargar lista de operarios activos para el selector
+  const opData = await api({ action:"getOperarios" });
+  const operarios = Array.isArray(opData) && opData.length > 0
+    ? opData.filter(o => (o.Estado||"").toLowerCase() === "activo" && (o.Rol||o.rol||"operario").toLowerCase() === "operario")
+    : [
+        { NombreCompleto:"García, Carlos" },
+        { NombreCompleto:"Martínez, Roberto" },
+        { NombreCompleto:"Pérez, Diego" },
+      ];
+
+  document.getElementById("content").innerHTML = `
+    <div id="sup-pedido-msg"></div>
+    <div class="card" style="max-width:600px">
+      <div class="card-title">Crear pedido de trabajo</div>
+      <div class="alert alert-info mb-16">Creado por: <strong>${state.nombre}</strong> — Supervisor</div>
+
+      <div class="form-group">
+        <label class="form-label">Descripción del trabajo *</label>
+        <textarea id="sp-desc" placeholder="Describir el trabajo a realizar, ubicación, detalles importantes..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Sector / Ubicación *</label>
+        <input id="sp-sector" type="text" placeholder="Ej: Terraza Bili, Sala de máquinas Güemes...">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Urgencia</label>
+        <select id="sp-urgencia">
+          <option value="Baja">Baja — puede esperar</option>
+          <option value="Media" selected>Media — dentro del turno</option>
+          <option value="Alta">Alta — atención inmediata</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Asignar a operario</label>
+        <select id="sp-operario">
+          <option value="">— Dejar en cola (cualquier operario) —</option>
+          ${operarios.map(o => `<option value="${o.NombreCompleto}">${o.NombreCompleto}${o.Turno ? " · " + o.Turno : ""}</option>`).join("")}
+        </select>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px">Si dejás vacío queda en la cola general para que lo asuma cualquier operario disponible.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Materiales necesarios (estimado)</label>
+        <input id="sp-materiales" type="text" placeholder="Ej: 1 llave de paso, silicona, cinta aislante...">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Observaciones adicionales</label>
+        <textarea id="sp-obs" placeholder="Cualquier información relevante para el operario..."></textarea>
+      </div>
+
+      <div class="flex-row mt-8">
+        <button class="btn btn-primary" onclick="enviarPedidoSupervisor()">➕ Crear pedido</button>
+        <button class="btn btn-ghost" onclick="navigate('cola')">Ver cola de pedidos</button>
+      </div>
+    </div>`;
+}
+
+async function enviarPedidoSupervisor() {
+  const desc = document.getElementById("sp-desc").value.trim();
+  const sector = document.getElementById("sp-sector").value.trim();
+  if (!desc || !sector) {
+    mostrarMsgSupPedido("warning", "⚠ Completar descripción y sector.");
+    return;
+  }
+
+  const operarioAsignado = document.getElementById("sp-operario").value;
+  const urgencia = document.getElementById("sp-urgencia").value;
+  const materiales = document.getElementById("sp-materiales").value.trim();
+  const obs = document.getElementById("sp-obs").value.trim();
+
+  const btn = document.querySelector("button[onclick='enviarPedidoSupervisor()']");
+  if (btn) { btn.disabled = true; btn.textContent = "Creando..."; }
+
+  // Crear el pedido
+  const res = await api({
+    action: "nuevoPedido",
+    servicio: "Supervisión — " + state.nombre,
+    solicitante: state.nombre,
+    descripcion: desc + " — Sector: " + sector + (obs ? " · " + obs : ""),
+    urgencia,
+  });
+
+  if (res && res.ok !== false) {
+    // Si hay operario asignado, asignarlo de inmediato
+    if (operarioAsignado && res.id) {
+      await api({ action:"asignarPedido", id: res.id, operario: operarioAsignado });
+    }
+    const msg = operarioAsignado
+      ? `✓ Pedido creado y asignado a <strong>${operarioAsignado}</strong>. Ref: ${res.id || "OK"}`
+      : `✓ Pedido creado en la cola general. Ref: ${res.id || "OK"}`;
+    mostrarMsgSupPedido("success", msg);
+    // Limpiar formulario
+    document.getElementById("sp-desc").value = "";
+    document.getElementById("sp-sector").value = "";
+    document.getElementById("sp-materiales").value = "";
+    document.getElementById("sp-obs").value = "";
+    document.getElementById("sp-operario").value = "";
+  } else {
+    mostrarMsgSupPedido("danger", "✗ Error al crear: " + (res?.error || "verificar conexión"));
+  }
+
+  if (btn) { btn.disabled = false; btn.innerHTML = "➕ Crear pedido"; }
+}
+
+function mostrarMsgSupPedido(tipo, texto) {
+  const el = document.getElementById("sup-pedido-msg");
+  if (!el) return;
+  el.innerHTML = `<div class="alert alert-${tipo}" style="max-width:600px">${texto}</div>`;
+  if (tipo === "success") setTimeout(() => { el.innerHTML = ""; }, 6000);
 }
 
 // ── DASHBOARD ────────────────────────────────────────────────
