@@ -352,15 +352,8 @@ tr:hover td { background: rgba(45,125,210,.05); }
 // ═══════════════════════════════════════════════════════════
 const API_URL = "https://script.google.com/macros/s/AKfycbwDUsEjROG4UkF6pyn-ZeBkEG6xGctg5x4tl2vb7ZScVQj3iLdDJVOsviL3TxykMgL0/exec";
 
-// PINS (en producción esto lo valida el servidor — estas son demo)
-const PINS_DEMO = {
-  "10001": { role:"servicio", nombre:"Guardia", servicio:"Guardia" },
-  "10002": { role:"servicio", nombre:"Enfermería PB", servicio:"Enfermería PB" },
-  "20001": { role:"operario", nombre:"Operario Demo", legajo:"001" },
-  "20002": { role:"operario", nombre:"Jose A. Ávalos", legajo:"002", noOxigeno:true },
-  "30001": { role:"supervisor", nombre:"Supervisor", legajo:"S01" },
-  "40001": { role:"director", nombre:"Dirección", legajo:"DIR" },
-};
+// Todos los PINs se validan contra Google Sheets — no hay PINs hardcodeados
+const PINS_DEMO = {}; // vacío — toda validación va al servidor
 
 // ── STATE ────────────────────────────────────────────────────
 let state = {
@@ -441,25 +434,18 @@ async function attemptLogin() {
   const pin = state.pinBuffer;
   const err = document.getElementById("login-error");
   err.textContent = "";
+  err.textContent = "Verificando...";
 
-  // Demo / local validation
-  const demo = PINS_DEMO[pin];
-  if (demo) {
-    state.role = demo.role;
-    state.nombre = demo.nombre;
-    state.legajo = demo.legajo || "";
-    state.servicio = demo.servicio || "";
-    state.noOxigeno = demo.noOxigeno || false;
-    launchApp();
-    return;
-  }
-
-  // Server validation
+  // Validar contra Google Sheets
   const res = await api({ action:"validarPIN", pin });
+
   if (res && res.ok) {
-    state.role = state.selectedRole;
-    state.nombre = res.servicio || "Usuario";
-    state.servicio = res.servicio || "";
+    state.role    = res.role    || "operario";
+    state.nombre  = res.nombre  || res.servicio || "Usuario";
+    state.legajo  = res.legajo  || "";
+    state.servicio= res.servicio|| "";
+    state.noOxigeno = res.noOxigeno || false;
+    err.textContent = "";
     launchApp();
   } else {
     err.textContent = "PIN incorrecto. Verificar e intentar nuevamente.";
