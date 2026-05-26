@@ -381,21 +381,35 @@ function startClock() {
 }
 
 // ── API ──────────────────────────────────────────────────────
-async function api(data) {
-  try {
+function api(data) {
+  return new Promise((resolve) => {
+    const cbName = "cb_" + Date.now() + "_" + Math.floor(Math.random()*10000);
     const params = new URLSearchParams();
     Object.entries(data).forEach(([k, v]) => {
       params.append(k, typeof v === "object" ? JSON.stringify(v) : v);
     });
-    const url = API_URL + "?" + params.toString();
-    const r = await fetch(url, { method:"GET", redirect:"follow" });
-    const text = await r.text();
-    try { return JSON.parse(text); }
-    catch(e2) { return { ok: false, error: "Respuesta invalida: " + text.substring(0,100) }; }
-  } catch(e) {
-    console.warn("API error:", e);
-    return { ok: false, error: "Sin conexion: " + e.message };
-  }
+    params.append("callback", cbName);
+    const script = document.createElement("script");
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve({ ok: false, error: "Timeout — verificar conexión con el servidor" });
+    }, 15000);
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[cbName] = function(result) {
+      cleanup();
+      resolve(result);
+    };
+    script.src = API_URL + "?" + params.toString();
+    script.onerror = function() {
+      cleanup();
+      resolve({ ok: false, error: "Error de red — verificar URL del servidor" });
+    };
+    document.head.appendChild(script);
+  });
 }
 
 // ── LOGIN ────────────────────────────────────────────────────
