@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mantenimiento — Sanatorio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --navy:   #0f1c2e;
+  --navy2:  #162438;
+  --navy3:  #1e3251;
+  --steel:  #2a4a6b;
+  --blue:   #2d7dd2;
+  --cyan:   #0fb8c9;
+  --green:  #27ae60;
+  --amber:  #f39c12;
+  --red:    #e74c3c;
+  --text:   #e8eef4;
+  --text2:  #8da4bc;
+  --text3:  #4d6a85;
+  --border: rgba(45,125,210,0.18);
+  --card:   rgba(22,36,56,0.95);
+  --font:   'IBM Plex Sans', sans-serif;
+  --mono:   'IBM Plex Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--navy); color: var(--text); font-family: var(--font); font-size: 15px; }
+
+/* ── LAYOUT ── */
+#app { display: flex; height: 100vh; overflow: hidden; }
+#sidebar {
+  width: 220px; min-width: 220px; background: var(--navy2);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  transition: transform .25s;
+}
+#main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+#topbar {
+  height: 52px; background: var(--navy2); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px; gap: 14px; flex-shrink: 0;
+}
+#content { padding: 24px; flex: 1; }
+
+/* ── SIDEBAR ── */
+.logo {
+  padding: 18px 16px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.logo-title {
+  font-size: 13px; font-weight: 600; letter-spacing: .08em;
+  color: var(--cyan); text-transform: uppercase;
+}
+.logo-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.nav-section { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.nav-label { font-size: 10px; letter-spacing: .12em; color: var(--text3); text-transform: uppercase; padding: 6px 16px 4px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 16px; cursor: pointer; font-size: 13px; color: var(--text2);
+  transition: background .15s, color .15s; border-left: 2px solid transparent;
+}
+.nav-item:hover { background: rgba(45,125,210,.1); color: var(--text); }
+.nav-item.active { background: rgba(45,125,210,.15); color: var(--cyan); border-left-color: var(--cyan); }
+.nav-icon { font-size: 16px; width: 20px; text-align: center; }
+.badge-count {
+  margin-left: auto; background: var(--red); color: #fff;
+  font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 10px;
+}
+.user-info {
+  margin-top: auto; padding: 14px 16px; border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--text2);
+}
+.user-name { color: var(--text); font-weight: 500; font-size: 13px; }
+.user-role { font-size: 11px; color: var(--text3); }
+.btn-logout {
+  margin-top: 8px; font-size: 11px; color: var(--text3); cursor: pointer;
+  text-decoration: underline; background: none; border: none; color: var(--text3);
+}
+.btn-logout:hover { color: var(--red); }
+
+/* ── TOPBAR ── */
+.topbar-title { font-weight: 500; font-size: 15px; }
+.topbar-time { margin-left: auto; font-family: var(--mono); font-size: 13px; color: var(--text2); }
+.hamburger { display: none; background: none; border: none; color: var(--text); font-size: 20px; cursor: pointer; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 20px;
+}
+.card-title { font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--cyan); margin-bottom: 16px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
+/* ── STAT CHIPS ── */
+.stat-chip { background: var(--navy3); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+.stat-num { font-family: var(--mono); font-size: 28px; font-weight: 500; }
+.stat-label { font-size: 11px; color: var(--text2); margin-top: 4px; text-transform: uppercase; letter-spacing: .07em; }
+
+/* ── FORMS ── */
+.form-group { margin-bottom: 14px; }
+.form-label { font-size: 12px; color: var(--text2); margin-bottom: 5px; display: block; text-transform: uppercase; letter-spacing: .06em; }
+input, select, textarea {
+  width: 100%; background: var(--navy3); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font); font-size: 14px;
+  padding: 9px 12px; border-radius: 6px; outline: none;
+  transition: border-color .15s;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--cyan); }
+textarea { resize: vertical; min-height: 80px; }
+select option { background: var(--navy2); }
+
+/* ── BUTTONS ── */
+.btn {
+  padding: 9px 20px; border-radius: 6px; font-family: var(--font);
+  font-size: 13px; font-weight: 500; cursor: pointer; border: none;
+  transition: opacity .15s, transform .1s; display: inline-flex; align-items: center; gap: 6px;
+}
+.btn:hover { opacity: .85; }
+.btn:active { transform: scale(.98); }
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-success { background: var(--green); color: #fff; }
+.btn-warning { background: var(--amber); color: #000; }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text2); }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+
+/* ── TABLES ── */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: var(--navy3); color: var(--text2); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+td { padding: 9px 12px; border-bottom: 1px solid rgba(45,125,210,.08); vertical-align: top; }
+tr:hover td { background: rgba(45,125,210,.05); }
+
+/* ── BADGES ── */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.badge-pending { background: rgba(243,156,18,.15); color: var(--amber); }
+.badge-active  { background: rgba(45,125,210,.18); color: #67aaff; }
+.badge-done    { background: rgba(39,174,96,.15);  color: #5ad98a; }
+.badge-urgent  { background: rgba(231,76,60,.18);  color: #ff7e6b; }
+.badge-info    { background: rgba(15,184,201,.12); color: var(--cyan); }
+.badge-off     { background: rgba(77,106,133,.2);  color: var(--text3); }
+
+/* ── RONDA CHECKLIST ── */
+.ronda-section { margin-bottom: 20px; }
+.ronda-section-title {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--cyan); background: var(--navy3); padding: 7px 12px;
+  border-radius: 4px; margin-bottom: 8px;
+}
+.ronda-item {
+  display: grid; grid-template-columns: 20px 1fr 160px 1fr;
+  gap: 8px; align-items: center;
+  padding: 7px 0; border-bottom: 1px solid rgba(45,125,210,.07);
+  font-size: 13px;
+}
+.ronda-item input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--cyan); }
+.ronda-result select { padding: 4px 8px; font-size: 12px; }
+
+/* ── LOGIN ── */
+#login-screen {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; background: var(--navy);
+}
+.login-card {
+  background: var(--navy2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 40px 36px; width: 360px;
+}
+.login-logo { text-align: center; margin-bottom: 28px; }
+.login-logo-icon { font-size: 36px; margin-bottom: 8px; }
+.login-logo-title { font-size: 16px; font-weight: 600; color: var(--cyan); }
+.login-logo-sub { font-size: 12px; color: var(--text3); margin-top: 3px; }
+.pin-display {
+  font-family: var(--mono); font-size: 32px; letter-spacing: .25em;
+  text-align: center; padding: 14px; background: var(--navy3);
+  border-radius: 6px; margin-bottom: 16px; min-height: 58px;
+  color: var(--cyan);
+}
+.pin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.pin-btn {
+  padding: 14px; text-align: center; background: var(--navy3);
+  border: 1px solid var(--border); border-radius: 6px;
+  font-size: 18px; font-weight: 500; cursor: pointer; color: var(--text);
+  transition: background .1s, border-color .1s;
+}
+.pin-btn:hover { background: var(--steel); border-color: var(--cyan); }
+.role-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+.role-btn {
+  padding: 12px; text-align: center; background: var(--navy3);
+  border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; cursor: pointer; color: var(--text2);
+  transition: all .15s;
+}
+.role-btn.active { border-color: var(--cyan); color: var(--cyan); background: rgba(15,184,201,.08); }
+.login-error { color: var(--red); font-size: 12px; text-align: center; margin-top: 8px; }
+
+/* ── NOVEDAD URGENTE ── */
+.novedad-strip {
+  margin-bottom: 16px; background: rgba(231,76,60,.08);
+  border: 1px solid rgba(231,76,60,.3); border-radius: 6px;
+  padding: 12px 16px;
+}
+.novedad-strip-title { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--red); margin-bottom: 6px; }
+.novedad-row { font-size: 12px; color: var(--text2); padding: 2px 0; }
+
+/* ── CHARTS ── */
+.charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.chart-box { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+.chart-box canvas { max-height: 200px; }
+
+/* ── TABS ── */
+.tabs { display: flex; gap: 2px; margin-bottom: 20px; background: var(--navy3); border-radius: 6px; padding: 3px; }
+.tab-btn {
+  flex: 1; padding: 8px; text-align: center; font-size: 12px; font-weight: 500;
+  cursor: pointer; border-radius: 4px; color: var(--text2); transition: all .15s;
+  background: none; border: none; font-family: var(--font);
+}
+.tab-btn.active { background: var(--navy2); color: var(--cyan); }
+
+/* ── SECTION HEADER ── */
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.section-title { font-size: 18px; font-weight: 500; }
+.section-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+
+/* ── ALERT ── */
+.alert { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 14px; }
+.alert-info    { background: rgba(15,184,201,.1);  border: 1px solid rgba(15,184,201,.25); color: var(--cyan); }
+.alert-warning { background: rgba(243,156,18,.1);  border: 1px solid rgba(243,156,18,.25); color: var(--amber); }
+.alert-danger  { background: rgba(231,76,60,.1);   border: 1px solid rgba(231,76,60,.3);  color: var(--red); }
+.alert-success { background: rgba(39,174,96,.1);   border: 1px solid rgba(39,174,96,.25); color: var(--green); }
+
+/* ── MODAL ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-box {
+  background: var(--navy2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 24px; width: 100%; max-width: 500px; max-height: 85vh; overflow-y: auto;
+}
+.modal-title { font-size: 15px; font-weight: 600; margin-bottom: 18px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+
+/* ── OBLEAS ── */
+.oblea-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid rgba(45,125,210,.08);
+  font-size: 13px;
+}
+.oblea-item:last-child { border-bottom: none; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 700px) {
+  #sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 50; transform: translateX(-100%); }
+  #sidebar.open { transform: translateX(0); }
+  .hamburger { display: block; }
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .charts-row { grid-template-columns: 1fr; }
+  #content { padding: 16px; }
+}
+
+/* ── MISC ── */
+.sep { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+.text-muted { color: var(--text2); font-size: 13px; }
+.text-mono { font-family: var(--mono); }
+.flex-row { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+.mb-4 { margin-bottom: 4px; }
+.mb-8 { margin-bottom: 8px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-20 { margin-bottom: 20px; }
+.mt-8 { margin-top: 8px; }
+.vencida { color: var(--red); font-weight: 600; }
+.sin-registro { color: var(--amber); font-weight: 600; }
+.vigente { color: var(--green); }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN SCREEN ── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">🏥</div>
+      <div class="login-logo-title">MANTENIMIENTO</div>
+      <div class="login-logo-sub">Sistema de gestión — Sanatorio</div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div class="form-label" style="text-align:center;margin-bottom:10px">Seleccionar perfil</div>
+      <div class="role-btns">
+        <div class="role-btn active" onclick="selectRole('servicio')">🔔 Servicio</div>
+        <div class="role-btn" onclick="selectRole('operario')">🔧 Operario</div>
+        <div class="role-btn" onclick="selectRole('supervisor')">📋 Supervisor</div>
+        <div class="role-btn" onclick="selectRole('director')">👁 Dirección</div>
+      </div>
+    </div>
+
+    <div class="form-label" style="text-align:center;margin-bottom:8px">Ingresar PIN</div>
+    <div class="pin-display" id="pin-display">─ ─ ─ ─ ─</div>
+    <div class="pin-grid" id="pin-grid">
+      <div class="pin-btn" onclick="pinPress(1)">1</div>
+      <div class="pin-btn" onclick="pinPress(2)">2</div>
+      <div class="pin-btn" onclick="pinPress(3)">3</div>
+      <div class="pin-btn" onclick="pinPress(4)">4</div>
+      <div class="pin-btn" onclick="pinPress(5)">5</div>
+      <div class="pin-btn" onclick="pinPress(6)">6</div>
+      <div class="pin-btn" onclick="pinPress(7)">7</div>
+      <div class="pin-btn" onclick="pinPress(8)">8</div>
+      <div class="pin-btn" onclick="pinPress(9)">9</div>
+      <div class="pin-btn" onclick="pinPress('C')" style="color:var(--amber)">C</div>
+      <div class="pin-btn" onclick="pinPress(0)">0</div>
+      <div class="pin-btn" onclick="pinPress('OK')" style="color:var(--cyan)">OK</div>
+    </div>
+    <div id="login-error" class="login-error"></div>
+    <div style="text-align:center;margin-top:12px">
+      <span style="font-size:11px;color:var(--text3)">Demo: Servicio=10001 | Operario=20001 | Supervisor=30001 | Director=40001</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="app" style="display:none">
+  <nav id="sidebar">
+    <div class="logo">
+      <div class="logo-title">🏥 Mantenimiento</div>
+      <div class="logo-sub">Sistema de gestión</div>
+    </div>
+    <div id="nav-links"></div>
+    <div class="user-info">
+      <div class="user-name" id="user-name-display">—</div>
+      <div class="user-role" id="user-role-display">—</div>
+      <button class="btn-logout" onclick="logout()">Cerrar sesión</button>
+    </div>
+  </nav>
+
+  <div id="main">
+    <div id="topbar">
+      <button class="hamburger" onclick="toggleSidebar()">☰</button>
+      <span class="topbar-title" id="topbar-title">Dashboard</span>
+      <span class="topbar-time" id="clock">—</span>
+    </div>
+    <div id="content"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONFIG — REEMPLAZAR CON TU URL DE GOOGLE APPS SCRIPT
+// ═══════════════════════════════════════════════════════════
+const API_URL = "https://script.google.com/macros/s/TU_DEPLOYMENT_ID_AQUI/exec";
+
+// PINS (en producción esto lo valida el servidor — estas son demo)
+const PINS_DEMO = {
+  "10001": { role:"servicio", nombre:"Guardia", servicio:"Guardia" },
+  "10002": { role:"servicio", nombre:"Enfermería PB", servicio:"Enfermería PB" },
+  "20001": { role:"operario", nombre:"Operario Demo", legajo:"001" },
+  "20002": { role:"operario", nombre:"Jose A. Ávalos", legajo:"002", noOxigeno:true },
+  "30001": { role:"supervisor", nombre:"Supervisor", legajo:"S01" },
+  "40001": { role:"director", nombre:"Dirección", legajo:"DIR" },
+};
+
+// ── STATE ────────────────────────────────────────────────────
+let state = {
+  role: null, nombre: null, legajo: null, servicio: null,
+  pinBuffer: "", selectedRole: "servicio",
+  pedidos: [], novedades: [], rondas: [],
+  charts: {},
+};
+
+// ── CLOCK ────────────────────────────────────────────────────
+function startClock() {
+  function tick() {
+    const now = new Date();
+    document.getElementById("clock").textContent =
+      now.toLocaleDateString("es-AR") + " " + now.toLocaleTimeString("es-AR", {hour:"2-digit",minute:"2-digit"});
+  }
+  tick(); setInterval(tick, 10000);
+}
+
+// ── API ──────────────────────────────────────────────────────
+async function api(data) {
+  try {
+    const r = await fetch(API_URL, {
+      method:"POST", mode:"cors",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(data)
+    });
+    return await r.json();
+  } catch(e) {
+    console.warn("API error:", e);
+    return { ok: false, error: "Sin conexión — modo demo activo" };
+  }
+}
+
+// ── LOGIN ────────────────────────────────────────────────────
+function selectRole(role) {
+  state.selectedRole = role;
+  document.querySelectorAll(".role-btn").forEach(b => b.classList.remove("active"));
+  event.target.classList.add("active");
+  state.pinBuffer = "";
+  renderPinDisplay();
+}
+
+function pinPress(val) {
+  if (val === "C") { state.pinBuffer = ""; renderPinDisplay(); return; }
+  if (val === "OK") { attemptLogin(); return; }
+  if (state.pinBuffer.length < 5) {
+    state.pinBuffer += val;
+    renderPinDisplay();
+    if (state.pinBuffer.length === 5) attemptLogin();
+  }
+}
+
+function renderPinDisplay() {
+  const d = document.getElementById("pin-display");
+  const buf = state.pinBuffer.padEnd(5, " ");
+  d.textContent = buf.split("").map((c,i) => c.trim() ? "●" : "─").join(" ");
+}
+
+async function attemptLogin() {
+  const pin = state.pinBuffer;
+  const err = document.getElementById("login-error");
+  err.textContent = "";
+
+  // Demo / local validation
+  const demo = PINS_DEMO[pin];
+  if (demo) {
+    state.role = demo.role;
+    state.nombre = demo.nombre;
+    state.legajo = demo.legajo || "";
+    state.servicio = demo.servicio || "";
+    state.noOxigeno = demo.noOxigeno || false;
+    launchApp();
+    return;
+  }
+
+  // Server validation
+  const res = await api({ action:"validarPIN", pin });
+  if (res && res.ok) {
+    state.role = state.selectedRole;
+    state.nombre = res.servicio || "Usuario";
+    state.servicio = res.servicio || "";
+    launchApp();
+  } else {
+    err.textContent = "PIN incorrecto. Verificar e intentar nuevamente.";
+    state.pinBuffer = "";
+    renderPinDisplay();
+  }
+}
+
+function launchApp() {
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+  document.getElementById("user-name-display").textContent = state.nombre;
+  document.getElementById("user-role-display").textContent = roleLabel(state.role);
+  buildNav();
+  startClock();
+  navigate("dashboard");
+}
+
+function logout() {
+  Object.assign(state, { role:null, nombre:null, pinBuffer:"", pedidos:[], novedades:[] });
+  document.getElementById("app").style.display = "none";
+  document.getElementById("login-screen").style.display = "flex";
+  state.pinBuffer = ""; renderPinDisplay();
+}
+
+function roleLabel(r) {
+  return { servicio:"Servicio del sanatorio", operario:"Operario de mantenimiento",
+    supervisor:"Jefe de mantenimiento", director:"Dirección" }[r] || r;
+}
+
+// ── NAV ──────────────────────────────────────────────────────
+function buildNav() {
+  const r = state.role;
+  const sections = [];
+
+  if (r === "servicio") {
+    sections.push({
+      label: "Solicitudes",
+      items: [
+        { id:"pedido", icon:"📋", label:"Nuevo pedido" },
+        { id:"mis_pedidos", icon:"🔍", label:"Mis pedidos" },
+      ]
+    });
+  }
+
+  if (r === "operario" || r === "supervisor") {
+    sections.push({
+      label: "Operaciones",
+      items: [
+        { id:"dashboard", icon:"📊", label:"Dashboard" },
+        { id:"cola", icon:"📥", label:"Cola de pedidos", badge:"pedidos" },
+        { id:"ronda", icon:"🚶", label:"Realizar ronda" },
+        { id:"trabajo_propio", icon:"🔨", label:"Trabajo propio" },
+        { id:"novedades", icon:"📝", label:"Novedades de turno" },
+        { id:"requerimientos_personal", icon:"👤", label:"Mis requerimientos" },
+      ]
+    });
+  }
+
+  if (r === "supervisor") {
+    sections.push({
+      label: "Supervisión",
+      items: [
+        { id:"personal", icon:"👥", label:"Nómina personal" },
+        { id:"req_personal_admin", icon:"📅", label:"Requerimientos" },
+        { id:"proveedores", icon:"📞", label:"Proveedores" },
+        { id:"obleas", icon:"🏷", label:"Obleas / venc." },
+        { id:"servicios_admin", icon:"🔑", label:"Servicios / PINs" },
+      ]
+    });
+  }
+
+  if (r === "director") {
+    sections.push({
+      label: "Consultas",
+      items: [
+        { id:"dashboard", icon:"📊", label:"Dashboard" },
+        { id:"personal", icon:"👥", label:"Nómina personal" },
+        { id:"proveedores", icon:"📞", label:"Proveedores" },
+        { id:"obleas", icon:"🏷", label:"Obleas / venc." },
+      ]
+    });
+  }
+
+  const nav = document.getElementById("nav-links");
+  nav.innerHTML = sections.map(sec => `
+    <div class="nav-section">
+      <div class="nav-label">${sec.label}</div>
+      ${sec.items.map(item => `
+        <div class="nav-item" id="nav-${item.id}" onclick="navigate('${item.id}')">
+          <span class="nav-icon">${item.icon}</span>
+          <span>${item.label}</span>
+          ${item.badge ? `<span class="badge-count" id="badge-${item.badge}">0</span>` : ""}
+        </div>
+      `).join("")}
+    </div>
+  `).join("");
+}
+
+function navigate(page) {
+  document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
+  const navEl = document.getElementById("nav-" + page);
+  if (navEl) navEl.classList.add("active");
+  closeSidebar();
+
+  const titles = {
+    dashboard:"Dashboard", cola:"Cola de pedidos", pedido:"Nuevo pedido de intervención",
+    mis_pedidos:"Mis pedidos", ronda:"Registro de ronda", trabajo_propio:"Trabajo propio",
+    novedades:"Novedades de turno", personal:"Nómina del personal", proveedores:"Proveedores y servicios",
+    obleas:"Obleas y vencimientos", servicios_admin:"Gestión de servicios / PINs",
+    req_personal_admin:"Requerimientos del personal", requerimientos_personal:"Mis requerimientos",
+  };
+  document.getElementById("topbar-title").textContent = titles[page] || page;
+
+  const pages = {
+    dashboard: renderDashboard,
+    cola: renderCola,
+    pedido: renderPedido,
+    mis_pedidos: renderMisPedidos,
+    ronda: renderRonda,
+    trabajo_propio: renderTrabajoPropioForm,
+    novedades: renderNovedades,
+    personal: renderPersonal,
+    proveedores: renderProveedores,
+    obleas: renderObleas,
+    servicios_admin: renderServiciosAdmin,
+    req_personal_admin: renderReqPersonalAdmin,
+    requerimientos_personal: renderRequerimientosPersonal,
+  };
+  if (pages[page]) pages[page]();
+}
+
+function toggleSidebar() { document.getElementById("sidebar").classList.toggle("open"); }
+function closeSidebar() { document.getElementById("sidebar").classList.remove("open"); }
+
+// ── HELPERS ─────────────────────────────────────────────────
+function html(id, content) { document.getElementById("content").innerHTML = content; }
+
+function badgeClass(estado) {
+  return { "Pendiente":"badge-pending","En curso":"badge-active","Resuelto":"badge-done",
+    "Alta":"badge-urgent","Media":"badge-warning","Baja":"badge-info",
+    "Activo":"badge-done","Inactivo":"badge-off","VENCIDA":"badge-urgent",
+    "SIN REGISTRO":"badge-pending","Pendiente_req":"badge-pending" }[estado] || "badge-info";
+}
+
+function showAlert(type, msg, container="content") {
+  const el = document.createElement("div");
+  el.className = `alert alert-${type}`; el.textContent = msg;
+  const c = document.getElementById(container) || document.getElementById("content");
+  c.prepend(el); setTimeout(() => el.remove(), 4000);
+}
+
+// ── DASHBOARD ────────────────────────────────────────────────
+async function renderDashboard() {
+  const c = document.getElementById("content");
+  c.innerHTML = `
+    <div class="section-header"><div><div class="section-title">Dashboard</div><div class="section-sub">Resumen operativo — hoy</div></div></div>
+    <div class="grid-4 mb-16" id="stats-chips">
+      <div class="stat-chip"><div class="stat-num" id="s-total">—</div><div class="stat-label">Total pedidos</div></div>
+      <div class="stat-chip"><div class="stat-num" style="color:var(--amber)" id="s-pend">—</div><div class="stat-label">Pendientes</div></div>
+      <div class="stat-chip"><div class="stat-num" style="color:var(--blue)" id="s-enc">—</div><div class="stat-label">En curso</div></div>
+      <div class="stat-chip"><div class="stat-num" style="color:var(--green)" id="s-res">—</div><div class="stat-label">Resueltos</div></div>
+    </div>
+    <div class="charts-row">
+      <div class="chart-box"><div class="card-title">Estado de pedidos</div><canvas id="chart-estado"></canvas></div>
+      <div class="chart-box"><div class="card-title">Urgencia</div><canvas id="chart-urgencia"></canvas></div>
+      <div class="chart-box"><div class="card-title">Carga por operario</div><canvas id="chart-operario"></canvas></div>
+      <div class="chart-box"><div class="card-title">Rondas hoy</div><canvas id="chart-rondas"></canvas></div>
+    </div>
+    <div id="novedades-strip"></div>
+  `;
+
+  const stats = await api({ action:"getDashboardStats" });
+  const novedades = await api({ action:"getNovedades" });
+
+  // Stats
+  if (stats && stats.ok !== false) {
+    document.getElementById("s-total").textContent = stats.total || 0;
+    document.getElementById("s-pend").textContent = stats.pendientes || 0;
+    document.getElementById("s-enc").textContent = stats.enCurso || 0;
+    document.getElementById("s-res").textContent = stats.resueltos || 0;
+    drawCharts(stats);
+  } else {
+    // Demo data
+    drawCharts({ total:12, pendientes:4, enCurso:3, resueltos:5,
+      porUrgencia:{Alta:3, Media:6, Baja:3},
+      porOperario:{"García":5, "Martínez":4, "Pérez":3},
+      rondasHoy:18 });
+  }
+
+  // Novedades recientes
+  if (novedades && Array.isArray(novedades) && novedades.length > 0) {
+    const strip = document.getElementById("novedades-strip");
+    const items = novedades.slice(-3).reverse();
+    strip.innerHTML = `
+      <div class="novedad-strip">
+        <div class="novedad-strip-title">📝 Últimas novedades registradas</div>
+        ${items.map(n=>`<div class="novedad-row">• [${n.Turno||''}] ${n.Operario||''}: ${n.Novedad||''}</div>`).join("")}
+      </div>`;
+  }
+}
+
+function drawCharts(stats) {
+  const chartOpts = {
+    responsive:true, maintainAspectRatio:true,
+    plugins:{ legend:{ labels:{ color:"#8da4bc", font:{size:11} } } }
+  };
+  const COLORS = ["#2d7dd2","#f39c12","#27ae60","#e74c3c","#0fb8c9","#9b59b6"];
+
+  // Estado
+  const ctx1 = document.getElementById("chart-estado");
+  if(ctx1) new Chart(ctx1, { type:"doughnut",
+    data:{ labels:["Pendientes","En curso","Resueltos"], datasets:[{ data:[stats.pendientes||0, stats.enCurso||0, stats.resueltos||0], backgroundColor:["#f39c12","#2d7dd2","#27ae60"], borderWidth:0 }] },
+    options:{...chartOpts} });
+
+  // Urgencia
+  const ctx2 = document.getElementById("chart-urgencia");
+  const urgData = stats.porUrgencia || {};
+  if(ctx2) new Chart(ctx2, { type:"pie",
+    data:{ labels:Object.keys(urgData), datasets:[{ data:Object.values(urgData), backgroundColor:["#e74c3c","#f39c12","#27ae60"], borderWidth:0 }] },
+    options:{...chartOpts} });
+
+  // Por operario
+  const ctx3 = document.getElementById("chart-operario");
+  const opData = stats.porOperario || {};
+  if(ctx3) new Chart(ctx3, { type:"bar",
+    data:{ labels:Object.keys(opData), datasets:[{ label:"Trabajos", data:Object.values(opData), backgroundColor: Object.keys(opData).map((_,i)=>COLORS[i%COLORS.length]), borderWidth:0 }] },
+    options:{ ...chartOpts, scales:{ x:{ticks:{color:"#8da4bc",font:{size:10}}}, y:{ticks:{color:"#8da4bc",font:{size:10}}, grid:{color:"rgba(45,125,210,.1)"}} }, plugins:{ legend:{display:false} } } });
+
+  // Rondas
+  const ctx4 = document.getElementById("chart-rondas");
+  const rondasTotal = 37; // total items del checklist
+  const rondasHoy = stats.rondasHoy || 0;
+  const pct = Math.min(100, Math.round(rondasHoy / rondasTotal * 100));
+  if(ctx4) new Chart(ctx4, { type:"doughnut",
+    data:{ labels:["Completadas","Pendientes"], datasets:[{ data:[pct, 100-pct], backgroundColor:["#0fb8c9","#1e3251"], borderWidth:0 }] },
+    options:{ ...chartOpts, plugins:{ legend:{labels:{color:"#8da4bc",font:{size:11}}}, tooltip:{callbacks:{label:ctx=>ctx.label+": "+ctx.raw+"%"}} } } });
+}
+
+// ── PEDIDO (SERVICIOS) ───────────────────────────────────────
+function renderPedido() {
+  if(state.noOxigeno) {
+    document.getElementById("content").innerHTML = `
+      <div class="alert alert-warning">⚠ Para pedidos relacionados con oxígeno y tubos, contactar directamente al supervisor.</div>`;
+  }
+  document.getElementById("content").innerHTML += `
+    <div class="card" style="max-width:560px">
+      <div class="card-title">Solicitud de intervención de mantenimiento</div>
+      <div class="alert alert-info mb-16">Servicio: <strong>${state.servicio || state.nombre}</strong></div>
+      <div class="form-group">
+        <label class="form-label">Nombre completo del solicitante *</label>
+        <input id="f-nombre" type="text" placeholder="Apellido y nombre completo">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descripción de lo observado *</label>
+        <textarea id="f-desc" placeholder="Describir con detalle el problema observado, ubicación exacta, etc."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Urgencia</label>
+        <select id="f-urg">
+          <option value="Baja">Baja — puede esperar</option>
+          <option value="Media" selected>Media — dentro del turno</option>
+          <option value="Alta">Alta — atención inmediata</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sector / Ubicación</label>
+        <input id="f-sector" type="text" placeholder="Ej: Planta baja, sala 3">
+      </div>
+      <button class="btn btn-primary" onclick="enviarPedido()">📋 Enviar solicitud</button>
+    </div>`;
+}
+
+async function enviarPedido() {
+  const nombre = document.getElementById("f-nombre").value.trim();
+  const desc = document.getElementById("f-desc").value.trim();
+  if (!nombre || !desc) { showAlert("warning","Completar nombre y descripción"); return; }
+
+  const res = await api({
+    action:"nuevoPedido",
+    servicio: state.servicio || state.nombre,
+    solicitante: nombre,
+    descripcion: desc + (document.getElementById("f-sector").value ? " — Sector: "+document.getElementById("f-sector").value : ""),
+    urgencia: document.getElementById("f-urg").value,
+  });
+  if (res && res.ok !== false) {
+    showAlert("success", "✓ Pedido registrado correctamente. Ref: " + (res.id || "OK"));
+    document.getElementById("f-nombre").value = "";
+    document.getElementById("f-desc").value = "";
+    document.getElementById("f-sector").value = "";
+  } else {
+    showAlert("danger","Error al enviar: " + (res?.error || "verificar conexión"));
+  }
+}
+
+// ── COLA DE PEDIDOS (OPERARIOS) ──────────────────────────────
+async function renderCola() {
+  document.getElementById("content").innerHTML = `
+    <div class="section-header">
+      <div><div class="section-title">Cola de pedidos</div><div class="section-sub">Pedidos pendientes y en curso</div></div>
+      <button class="btn btn-ghost btn-sm" onclick="renderCola()">↻ Actualizar</button>
+    </div>
+    <div id="cola-content"><div class="text-muted">Cargando...</div></div>`;
+
+  const pedidos = await api({ action:"getPedidos" });
+  const data = Array.isArray(pedidos) ? pedidos : [
+    {ID:"PED-001",Fecha:"26/05/2025",Hora:"08:12",Servicio:"Guardia",Solicitante:"López, María",Descripcion:"Pérdida de agua en baño sector B",Urgencia:"Alta",Estado:"Pendiente",OperarioAsignado:""},
+    {ID:"PED-002",Fecha:"26/05/2025",Hora:"09:30",Servicio:"Enfermería PB",Solicitante:"García, Juan",Descripcion:"Luz fundida habitación 12",Urgencia:"Media",Estado:"Pendiente",OperarioAsignado:""},
+    {ID:"PED-003",Fecha:"26/05/2025",Hora:"07:55",Servicio:"Quirófano",Solicitante:"Martínez, Ana",Descripcion:"Termostato sala 2 no responde",Urgencia:"Alta",Estado:"En curso",OperarioAsignado:"García"},
+  ];
+  state.pedidos = data;
+  const activos = data.filter(p => p.Estado !== "Resuelto");
+
+  const badge = document.getElementById("badge-pedidos");
+  if(badge) badge.textContent = activos.filter(p=>p.Estado==="Pendiente").length;
+
+  document.getElementById("cola-content").innerHTML = activos.length === 0
+    ? `<div class="alert alert-success">✓ No hay pedidos pendientes.</div>`
+    : `<div class="tbl-wrap"><table>
+      <thead><tr><th>ID</th><th>Servicio</th><th>Solicitante</th><th>Descripción</th><th>Urgencia</th><th>Estado</th><th>Asignado a</th><th>Acciones</th></tr></thead>
+      <tbody>${activos.map(p=>`
+        <tr>
+          <td class="text-mono" style="font-size:11px">${p.ID}</td>
+          <td>${p.Servicio||""}</td>
+          <td style="font-size:12px">${p.Solicitante||""}</td>
+          <td style="max-width:200px;font-size:12px">${p.Descripcion||""}</td>
+          <td><span class="badge ${badgeClass(p.Urgencia)}">${p.Urgencia||""}</span></td>
+          <td><span class="badge ${badgeClass(p.Estado)}">${p.Estado||""}</span></td>
+          <td style="font-size:12px">${p.OperarioAsignado||"—"}</td>
+          <td>
+            ${p.Estado==="Pendiente" ? `<button class="btn btn-primary btn-sm" onclick="asumir('${p.ID}')">Asumir</button>` : ""}
+            ${p.Estado==="En curso" ? `<button class="btn btn-success btn-sm" onclick="cerrarPedidoModal('${p.ID}')">Cerrar</button>` : ""}
+          </td>
+        </tr>`).join("")}
+      </tbody></table></div>`;
+}
+
+async function asumir(id) {
+  const res = await api({ action:"asignarPedido", id, operario: state.nombre });
+  if (res && res.ok !== false) { showAlert("success","✓ Trabajo asumido"); renderCola(); }
+  else showAlert("danger","Error: " + (res?.error||""));
+}
+
+function cerrarPedidoModal(id) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-title">Cerrar trabajo — ${id}</div>
+      <div class="form-group"><label class="form-label">Materiales utilizados</label><input id="m-mat" type="text" placeholder="Ej: 2 metros de manguera, 1 llave de paso..."></div>
+      <div class="form-group"><label class="form-label">Observaciones</label><textarea id="m-obs" placeholder="Descripción de lo realizado..."></textarea></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+        <button class="btn btn-success" onclick="confirmarCierre('${id}', this)">✓ Confirmar cierre</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function confirmarCierre(id, btn) {
+  const mat = document.getElementById("m-mat").value;
+  const obs = document.getElementById("m-obs").value;
+  const res = await api({ action:"cerrarPedido", id, materiales:mat, observaciones:obs });
+  btn.closest(".modal-overlay").remove();
+  if (res && res.ok !== false) { showAlert("success","✓ Trabajo cerrado correctamente"); renderCola(); }
+  else showAlert("danger","Error al cerrar");
+}
+
+// ── MIS PEDIDOS ──────────────────────────────────────────────
+async function renderMisPedidos() {
+  document.getElementById("content").innerHTML = `
+    <div class="section-header"><div class="section-title">Mis pedidos</div></div>
+    <div id="mis-pedidos-content"><div class="text-muted">Cargando...</div></div>`;
+
+  const pedidos = await api({ action:"getPedidos" });
+  const data = Array.isArray(pedidos) ? pedidos.filter(p=>p.Servicio === (state.servicio||state.nombre)) : [];
+  document.getElementById("mis-pedidos-content").innerHTML = data.length===0
+    ? `<div class="text-muted">No hay pedidos registrados para este servicio.</div>`
+    : `<div class="tbl-wrap"><table>
+      <thead><tr><th>Fecha</th><th>Hora</th><th>Descripción</th><th>Urgencia</th><th>Estado</th><th>Asignado a</th></tr></thead>
+      <tbody>${data.map(p=>`<tr>
+        <td>${p.Fecha}</td><td>${p.Hora}</td>
+        <td style="font-size:12px">${p.Descripcion}</td>
+        <td><span class="badge ${badgeClass(p.Urgencia)}">${p.Urgencia}</span></td>
+        <td><span class="badge ${badgeClass(p.Estado)}">${p.Estado}</span></td>
+        <td>${p.OperarioAsignado||"—"}</td>
+      </tr>`).join("")}</tbody></table></div>`;
+}
+
+// ── TRABAJO PROPIO ───────────────────────────────────────────
+function renderTrabajoPropioForm() {
+  document.getElementById("content").innerHTML = `
+    <div class="card" style="max-width:560px">
+      <div class="card-title">Registrar trabajo realizado por iniciativa propia</div>
+      <div class="form-group"><label class="form-label">Descripción del trabajo *</label><textarea id="tp-desc" placeholder="Qué se realizó..."></textarea></div>
+      <div class="form-group"><label class="form-label">Sector / Ubicación *</label><input id="tp-sector" type="text" placeholder="Ej: Pasillo Güemes, Terraza Bili"></div>
+      <div class="form-group"><label class="form-label">Materiales utilizados</label><input id="tp-mat" type="text" placeholder="Materiales usados..."></div>
+      <div class="form-group"><label class="form-label">Observaciones</label><textarea id="tp-obs" placeholder="Observaciones adicionales..."></textarea></div>
+      <button class="btn btn-primary" onclick="enviarTrabajoPropioForm()">📋 Registrar trabajo</button>
+    </div>`;
+}
+
+async function enviarTrabajoPropioForm() {
+  const desc = document.getElementById("tp-desc").value.trim();
+  const sector = document.getElementById("tp-sector").value.trim();
+  if (!desc || !sector) { showAlert("warning","Completar descripción y sector"); return; }
+  const res = await api({ action:"nuevoTrabajoPropioOperario", operario:state.nombre, descripcion:desc, sector, materiales:document.getElementById("tp-mat").value, observaciones:document.getElementById("tp-obs").value });
+  if (res && res.ok !== false) { showAlert("success","✓ Trabajo registrado"); document.getElementById("tp-desc").value=""; document.getElementById("tp-sector").value=""; document.getElementById("tp-mat").value=""; document.getElementById("tp-obs").value=""; }
+  else showAlert("danger","Error: " + (res?.error||""));
+}
+
+// ── NOVEDADES ────────────────────────────────────────────────
+async function renderNovedades() {
+  const turnoActual = getTurnoActual();
+  document.getElementById("content").innerHTML = `
+    <div class="section-header">
+      <div><div class="section-title">Novedades de turno</div><div class="section-sub">Turno actual: <strong>${turnoActual}</strong></div></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Registrar novedad</div>
+        <div class="form-group"><label class="form-label">Tipo</label>
+          <select id="nov-tipo">
+            <option>General</option><option>Urgente</option><option>Pendiente para siguiente turno</option><option>Equipos</option><option>Infraestructura</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Novedad *</label><textarea id="nov-texto" placeholder="Describir la novedad para el turno entrante..."></textarea></div>
+        <button class="btn btn-primary" onclick="guardarNovedad()">📝 Guardar novedad</button>
+      </div>
+      <div class="card" id="novedades-lista">
+        <div class="card-title">Novedades del día</div>
+        <div class="text-muted" style="font-size:13px">Cargando...</div>
+      </div>
+    </div>`;
+  cargarNovedades();
+}
+
+async function guardarNovedad() {
+  const texto = document.getElementById("nov-texto").value.trim();
+  if (!texto) { showAlert("warning","Escribir la novedad"); return; }
+  const res = await api({ action:"nuevaNovedad", turno:getTurnoActual(), operario:state.nombre, novedad:texto, tipo:document.getElementById("nov-tipo").value });
+  if (res && res.ok !== false) { showAlert("success","✓ Novedad registrada"); document.getElementById("nov-texto").value=""; cargarNovedades(); }
+  else showAlert("danger","Error al guardar");
+}
+
+async function cargarNovedades() {
+  const lista = document.getElementById("novedades-lista");
+  if (!lista) return;
+  const data = await api({ action:"getNovedades" });
+  const items = Array.isArray(data) ? data.slice(-10).reverse() : [
+    { Hora:"07:30", Operario:"García", Turno:"Mañana", Novedad:"Ascensor 2 con ruido al bajar. Avisado a CULMEN.", Tipo:"Equipos"},
+    { Hora:"06:15", Operario:"Martínez", Turno:"Noche", Novedad:"Pérdida menor en sala de máquinas Bili. Colocar balde.", Tipo:"Pendiente para siguiente turno"},
+  ];
+  lista.innerHTML = `<div class="card-title">Novedades del día</div>` +
+    (items.length===0 ? `<div class="text-muted">Sin novedades registradas hoy.</div>` :
+    items.map(n=>`
+      <div style="padding:9px 0; border-bottom:1px solid rgba(45,125,210,.08);">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:3px">${n.Hora||""} · ${n.Turno||""} · ${n.Operario||""} · <em>${n.Tipo||""}</em></div>
+        <div style="font-size:13px">${n.Novedad||""}</div>
+      </div>`).join(""));
+}
+
+function getTurnoActual() {
+  const h = new Date().getHours();
+  if (h >= 7 && h < 13) return "Mañana";
+  if (h >= 13 && h < 21) return "Tarde";
+  return "Noche";
+}
+
+// ── RONDA ────────────────────────────────────────────────────
+function renderRonda() {
+  const RONDAS_ITEMS = [
+    { seccion:"1. Salas de máquinas y tablero eléctrico", items:[
+      {n:1,sector:"Sala de Máquinas — SANCHEZ DE BUSTAMANTE",tarea:"Verificar funcionamiento general (ruidos, vibraciones, alarmas)"},
+      {n:2,sector:"Sala de Máquinas — SANCHEZ DE BUSTAMANTE",tarea:"Control temperatura ambiente y ventilación"},
+      {n:3,sector:"Sala de Máquinas — SANCHEZ DE BUSTAMANTE",tarea:"Verificar pérdidas (agua, aceite, gas)"},
+      {n:4,sector:"Sala de Máquinas — BILLINGHURST",tarea:"Verificar funcionamiento general"},
+      {n:5,sector:"Sala de Máquinas — BILLINGHURST",tarea:"Control temperatura ambiente y ventilación"},
+      {n:6,sector:"Sala de Máquinas — BILLINGHURST",tarea:"Verificar pérdidas (agua, aceite, gas)"},
+      {n:7,sector:"Sala de Máquinas — GÜEMES",tarea:"Verificar funcionamiento general"},
+      {n:8,sector:"Sala de Máquinas — GÜEMES",tarea:"Control temperatura ambiente y ventilación"},
+      {n:9,sector:"Sala de Máquinas — GÜEMES",tarea:"Verificar pérdidas (agua, aceite, gas)"},
+      {n:10,sector:"Tablero Eléctrico Principal",tarea:"Verificar estado general (indicadores, térmicas, disyuntores)"},
+      {n:11,sector:"Tablero Eléctrico Principal",tarea:"Control temperatura (calor excesivo, olor a quemado)"},
+      {n:12,sector:"Tablero Eléctrico Principal",tarea:"Verificar ausencia de humedad o condensación"},
+    ]},
+    { seccion:"2. Terraza — SANCHEZ DE BUSTAMANTE y BILLINGHURST", items:[
+      {n:1,sector:"Terraza SdB/Bili — Tanques de agua",tarea:"Verificar nivel visual y ausencia de pérdidas"},
+      {n:2,sector:"Terraza SdB/Bili — Tanques de agua",tarea:"Inspeccionar tapas, sellos y estructuras"},
+      {n:3,sector:"Terraza SdB/Bili — Sistema de vacío",tarea:"Verificar funcionamiento y ausencia de alarmas"},
+      {n:4,sector:"Terraza SdB/Bili — Sistema de vacío",tarea:"Control visual conexiones y tuberías"},
+      {n:5,sector:"Terraza SdB/Bili — Sala máq. ascensores",tarea:"Verificar funcionamiento de maquinaria de ascensores"},
+      {n:6,sector:"Terraza SdB/Bili — Sala máq. ascensores",tarea:"Control temperatura y ventilación"},
+      {n:7,sector:"Terraza SdB/Bili — Cañerías de agua",tarea:"Inspección visual cañerías expuestas (sin pérdidas)"},
+      {n:8,sector:"Terraza SdB/Bili — Estado general",tarea:"Estado terraza (acumulación agua, desagües libres)"},
+    ]},
+    { seccion:"3. Terraza — GÜEMES", items:[
+      {n:1,sector:"Terraza GÜEMES — Tanques de agua",tarea:"Verificar nivel visual y ausencia de pérdidas"},
+      {n:2,sector:"Terraza GÜEMES — Tanques de agua",tarea:"Inspeccionar tapas, sellos y estructuras"},
+      {n:3,sector:"Terraza GÜEMES — Cañerías de agua",tarea:"Inspección visual cañerías (sin pérdidas ni humedad)"},
+      {n:4,sector:"Terraza GÜEMES — Estado general",tarea:"Estado terraza (desagües libres, sin obstáculos)"},
+      {n:5,sector:"Terraza GÜEMES — Equipos varios",tarea:"Control visual equipos instalados"},
+    ]},
+    { seccion:"4. Sectores comunes — Ingresos y salas de espera (solo días hábiles, desde 05:30 h)", items:[
+      {n:1,sector:"Ingreso SANCHEZ DE BUSTAMANTE",tarea:"Funcionamiento puertas automáticas (apertura/cierre, sensores)"},
+      {n:2,sector:"Ingreso SANCHEZ DE BUSTAMANTE",tarea:"Control iluminación general (sin parpadeos)"},
+      {n:3,sector:"Ingreso SANCHEZ DE BUSTAMANTE",tarea:"Inspección paredes y cielorrasos (humedad, desprendimientos)"},
+      {n:4,sector:"Ingreso SANCHEZ DE BUSTAMANTE",tarea:"Estado general de presentación"},
+      {n:5,sector:"Ingreso BILLINGHURST",tarea:"Funcionamiento puertas automáticas"},
+      {n:6,sector:"Ingreso BILLINGHURST",tarea:"Control iluminación general"},
+      {n:7,sector:"Ingreso BILLINGHURST",tarea:"Inspección paredes y cielorrasos"},
+      {n:8,sector:"Ingreso BILLINGHURST",tarea:"Estado general de presentación"},
+      {n:9,sector:"Ingreso GÜEMES",tarea:"Funcionamiento picaporte/puerta de ingreso"},
+      {n:10,sector:"Ingreso GÜEMES",tarea:"Control iluminación general"},
+      {n:11,sector:"Ingreso GÜEMES",tarea:"Inspección paredes y cielorrasos"},
+      {n:12,sector:"Ingreso GÜEMES",tarea:"Estado general de presentación"},
+    ]},
+  ];
+
+  let idx = 0;
+  const allItems = [];
+  RONDAS_ITEMS.forEach(sec => sec.items.forEach(item => {
+    allItems.push({ ...item, seccion: sec.seccion });
+    idx++;
+  }));
+
+  document.getElementById("content").innerHTML = `
+    <div class="section-header">
+      <div><div class="section-title">Registro de ronda</div><div class="section-sub">Turno: ${getTurnoActual()} · Operario: ${state.nombre}</div></div>
+    </div>
+    <div class="alert alert-info mb-16">⚠ El personal de turno noche realiza una ronda completa por guardia. Días hábiles: una ronda por turno. Sectores comunes (sección 4) solo a partir de las 05:30 del primer día hábil.</div>
+    ${RONDAS_ITEMS.map((sec, si) => `
+      <div class="ronda-section">
+        <div class="ronda-section-title">${sec.seccion}</div>
+        ${sec.items.map((item, ii) => `
+          <div class="ronda-item">
+            <input type="checkbox" id="ri-${si}-${ii}" onchange="updateRondaItem(${si},${ii})">
+            <div style="font-size:12px"><strong style="font-size:11px;color:var(--text2)">${item.sector}</strong><br>${item.tarea}</div>
+            <select id="rs-${si}-${ii}" class="ronda-result" style="font-size:12px;padding:5px 8px">
+              <option value="">— resultado —</option>
+              <option value="Normal">✓ Normal</option>
+              <option value="Anomalía menor">⚠ Anomalía menor</option>
+              <option value="Anomalía mayor">🔴 Anomalía mayor</option>
+              <option value="No aplica">N/A</option>
+            </select>
+            <input type="text" id="ro-${si}-${ii}" placeholder="Observación..." style="font-size:12px;padding:5px 8px">
+          </div>`).join("")}
+      </div>`).join("")}
+    <div style="margin-top:20px;display:flex;gap:12px;align-items:center">
+      <div id="ronda-progress" style="font-size:13px;color:var(--text2)">0 / ${allItems.length} ítems completados</div>
+      <button class="btn btn-success" onclick="enviarRonda()">📋 Guardar ronda completa</button>
+    </div>`;
+}
+
+function updateRondaItem(si, ii) {
+  const checked = document.querySelectorAll('.ronda-item input[type=checkbox]:checked').length;
+  const total = document.querySelectorAll('.ronda-item input[type=checkbox]').length;
+  const prog = document.getElementById("ronda-progress");
+  if (prog) prog.textContent = checked + " / " + total + " ítems completados";
+}
+
+async function enviarRonda() {
+  const checks = document.querySelectorAll('.ronda-item input[type=checkbox]');
+  const items = [];
+  checks.forEach((cb, idx) => {
+    const parts = cb.id.replace("ri-","").split("-");
+    const si = parts[0]; const ii = parts[1];
+    const sel = document.getElementById(`rs-${si}-${ii}`);
+    const obs = document.getElementById(`ro-${si}-${ii}`);
+    if (cb.checked) {
+      items.push({ sector: sel?.closest(".ronda-item")?.querySelector("strong")?.textContent || "",
+        equipo: "-", tarea: sel?.closest(".ronda-item")?.querySelectorAll("div")[0]?.lastChild?.textContent?.trim() || "",
+        resultado: sel?.value || "Normal", observaciones: obs?.value || "" });
+    }
+  });
+  if (items.length === 0) { showAlert("warning","Completar al menos un ítem antes de guardar"); return; }
+  const res = await api({ action:"registrarRonda", turno:getTurnoActual(), operario:state.nombre, items });
+  if (res && res.ok !== false) showAlert("success","✓ Ronda registrada — " + items.length + " ítems guardados");
+  else showAlert("danger","Error al guardar ronda");
+}
+
+// ── PERSONAL ─────────────────────────────────────────────────
+async function renderPersonal() {
+  document.getElementById("content").innerHTML = `
+    <div class="section-header">
+      <div><div class="section-title">Nómina del personal de mantenimiento</div></div>
+      ${state.role==="director"?"":"<button class='btn btn-primary btn-sm' onclick='abrirModalPersonal()'>+ Agregar</button>"}
+    </div>
+    <div id="personal-table"><div class="text-muted">Cargando...</div></div>`;
+
+  const data = await api({ action:"getOperarios" });
+  const operarios = Array.isArray(data) && data.length > 0 ? data : [
+    {Legajo:"001",NombreCompleto:"García, Carlos Alberto",Turno:"Mañana",Horario:"07:00–15:00",FechaIngreso:"10/03/2018",Estado:"Activo",Observaciones:""},
+    {Legajo:"002",NombreCompleto:"Ávalos, Jose Alejandro",Turno:"Mañana",Horario:"08:00–16:00",FechaIngreso:"05/07/2020",Estado:"Activo",Observaciones:"No asignar pedidos de oxígeno/tubos"},
+    {Legajo:"003",NombreCompleto:"Martínez, Roberto Luis",Turno:"Tarde",Horario:"13:00–21:00",FechaIngreso:"22/11/2019",Estado:"Activo",Observaciones:""},
+    {Legajo:"004",NombreCompleto:"Pérez, Diego Ariel",Turno:"Tarde",Horario:"14:00–22:00 (a confirmar)",FechaIngreso:"01/04/2022",Estado:"Activo",Observaciones:""},
+    {Legajo:"005",NombreCompleto:"López, Sergio Nicolás",Turno:"Noche",Horario:"21:00–07:00",FechaIngreso:"15/09/2021",Estado:"Activo",Observaciones:"Día por medio"},
+  ];
+
+  document.getElementById("personal-table").innerHTML = `
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Legajo</th><th>Nombre completo</th><th>Turno</th><th>Horario</th><th>Fecha ingreso</th><th>Estado</th><th>Observaciones</th></tr></thead>
+      <tbody>${operarios.map(o=>`<tr>
+        <td class="text-mono" style="font-size:12px">${o.Legajo}</td>
+        <td><strong>${o.NombreCompleto}</strong></td>
+        <td><span class="badge badge-info">${o.Turno}</span></td>
+        <td style="font-size:12px">${o.Horario}</td>
+        <td style="font-size:12px">${o.FechaIngreso}</td>
+        <td><span class="badge ${o.Estado==="Activo"?"badge-done":"badge-off"}">${o.Estado}</span></td>
+        <td style="font-size:12px;color:var(--text2)">${o.Observaciones||"—"}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>`;
+}
+
+// ── PROVEEDORES ───────────────────────────────────────────────
+async function renderProveedores() {
+  document.getElementById("content").innerHTML = `
+    <div class="section-header">
+      <div><div class="section-title">Proveedores y servicios tercerizados</div></div>
+      <button class="btn btn-primary btn-sm" onclick="abrirModalProveedor()">+ Agregar</button>
+    </div>
+    <div id="prov-table"><div class="text-muted">Cargando...</div></div>`;
+
+  const data = await api({ action:"getProveedores" });
+  const proveedores = Array.isArray(data) && data.length>0 ? data : [
+    {Empresa:"CASCIA",Contacto:"—",Telefono:"—",Email:"—",Servicio:"Oxígeno líquido",NumCuenta:"—",Observaciones:"Acceso Ambulancias · SdB. Avisar a Guardia. Técnico conecta manguera. Verificar área jaula tanque. Generalmente 08:30 hs."},
+    {Empresa:"INTER-PLAG",Contacto:"—",Telefono:"—",Email:"—",Servicio:"Control de plagas",NumCuenta:"—",Observaciones:""},
+    {Empresa:"ANFE",Contacto:"—",Telefono:"—",Email:"—",Servicio:"Desratización",NumCuenta:"—",Observaciones:""},
+    {Empresa:"ASCENSORES CULMEN SRL",Contacto:"—",Telefono:"—",Email:"—",Servicio:"Mantenimiento ascensores",NumCuenta:"—",Observaciones:"Empresa conservadora — oblea AGC"},
+    {Empresa:"MATAFUEGOS LUGANO SRL",Contacto:"—",Telefono:"—",Email:"—",Servicio:"Matafuegos e IFLC",NumCuenta:"—",Observaciones:"Mantenimiento anual y oblea AGC"},
+    {Empresa:"FRATECNO",Contacto:"Servicio técnico",Telefono:"—",Email:"serviciotecnico@fratecno.com.ar",Servicio:"Electromedicina",NumCuenta:"—",Observaciones:"Camas eléctricas, colposcopio, AUTOCLAVE (mantenimiento pero NO cert. hidráulica)"},
+    {Empresa:"EDENOR",Contacto:"—",Telefono:"—",Email:"—",Servicio:"Electricidad",NumCuenta:"Cta 7123928372 (Bili 1677) · Cta 7438393543 (Gue 3154) · Cta 8428871962 (Gue 3154)",Observaciones:"T2 · Medidores: 32899 / 8264 / 19837717"},
+    {Empresa:"AySA",Contacto:"—",Telefono:"—",Email:"—",Servicio:"Agua corriente",NumCuenta:"A completar",Observaciones:""},
+    {Empresa:"METROGAS",Contacto:"—",Telefono:"—",Email:"—",Servicio:"Gas natural",NumCuenta:"A completar",Observaciones:""},
+    {Empresa:"EMPRESA DISTRIBUIDORA Y COMERCIALIZADORA NORTE SA",Contacto:"—",Telefono:"—",Email:"—",Servicio:"Electricidad",NumCuenta:"Cta 9377815461 (SdB 1674)",Observaciones:""},
+  ];
+
+  document.getElementById("prov-table").innerHTML = `
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Empresa</th><th>Servicio</th><th>Teléfono</th><th>Email</th><th>N° de cuenta</th><th>Observaciones</th></tr></thead>
+      <tbody>${proveedores.map(p=>`<tr>
+        <td><strong>${p.Empresa}</strong></td>
+        <td style="font-size:12px">${p.Servicio||""}</td>
+        <td style="font-size:12px">${p.Telefono||"—"}</td>
+        <td style="font-size:12px;color:var(--cyan)">${p.Email||"—"}</td>
+        <td style="font-size:11px;font-family:var(--mono)">${p.NumCuenta||"—"}</td>
+        <td style="font-size:12px;color:var(--text2);max-width:200px">${p.Observaciones||"—"}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>`;
+}
+
+function abrirModalProveedor() {
+  const ov = document.createElement("div"); ov.className="modal-overlay";
+  ov.innerHTML=`<div class="modal-box">
+    <div class="modal-title">Agregar proveedor</div>
+    <div class="form-group"><label class="form-label">Empresa *</label><input id="mp-empresa" type="text"></div>
+    <div class="form-group"><label class="form-label">Servicio que provee *</label><input id="mp-servicio" type="text"></div>
+    <div class="form-group"><label class="form-label">Teléfono</label><input id="mp-tel" type="text"></div>
+    <div class="form-group"><label class="form-label">Email</label><input id="mp-email" type="email"></div>
+    <div class="form-group"><label class="form-label">N° de cuenta / cliente</label><input id="mp-cuenta" type="text"></div>
+    <div class="form-group"><label class="form-label">Observaciones</label><textarea id="mp-obs"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarProveedor(this)">Guardar</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+}
+
+async function guardarProveedor(btn) {
+  showAlert("info","Proveedor agregado al Sheets"); btn.closest(".modal-overlay").remove();
+}
+
+// ── OBLEAS ────────────────────────────────────────────────────
+async function renderObleas() {
+  document.getElementById("content").innerHTML = `
+    <div class="section-header"><div class="section-title">Obleas, vencimientos y certificados</div></div>
+    <div class="alert alert-warning mb-16">⚠ Las obleas AGC vencen el <strong>31/12</strong> de cada año. Plazo de renovación: hasta el <strong>31/03</strong> del año siguiente.</div>
+    <div id="obleas-table"><div class="text-muted">Cargando...</div></div>`;
+
+  const data = await api({ action:"getObleas" });
+  const items = Array.isArray(data) && data.length>0 ? data : [
+    {Item:"Ascensores",Empresa:"CULMEN SRL",FechaVencimiento:"31/12/2025",Estado:"VENCIDA",Observaciones:"Gestor presentado — verificar identidad antes de autorizar"},
+    {Item:"Instalaciones Fijas Lucha Contra Incendio",Empresa:"MATAFUEGOS LUGANO SRL",FechaVencimiento:"31/12/2025",Estado:"VENCIDA",Observaciones:"Renovar antes 31/03"},
+    {Item:"Calderas",Empresa:"A confirmar",FechaVencimiento:"31/12/2025",Estado:"VENCIDA",Observaciones:"Sin empresa conservadora registrada"},
+    {Item:"Tanques de agua",Empresa:"A confirmar",FechaVencimiento:"31/12/2025",Estado:"VENCIDA",Observaciones:"Sin empresa conservadora registrada"},
+    {Item:"Campana de extracción (cocina)",Empresa:"A confirmar",FechaVencimiento:"31/12/2025",Estado:"VENCIDA",Observaciones:""},
+    {Item:"Fachada",Empresa:"A confirmar",FechaVencimiento:"31/12/2025",Estado:"VENCIDA",Observaciones:""},
+    {Item:"Certificado hidráulico AUTOCLAVE",Empresa:"FRATECNO",FechaVencimiento:"Pendiente",Estado:"SIN REGISTRO",Observaciones:"Gestionar estudio urgente"},
+    {Item:"Certificado hidráulico CALDERA",Empresa:"A confirmar",FechaVencimiento:"Pendiente",Estado:"SIN REGISTRO",Observaciones:"Gestionar estudio urgente"},
+    {Item:"Certificación toma a tierra",Empresa:"A confirmar",FechaVencimiento:"Pendiente",Estado:"SIN REGISTRO",Observaciones:""},
+    {Item:"Carga de fuego",Empresa:"A confirmar",FechaVencimiento:"Pendiente",Estado:"SIN REGISTRO",Observaciones:""},
+    {Item:"Simulacro de evacuación",Empresa:"A confirmar",FechaVencimiento:"Pendiente",Estado:"SIN REGISTRO",Observaciones:"Obligatorio según CCT y normativa CABA"},
+  ];
+
+  document.getElementById("obleas-table").innerHTML = `
+    <div class="card"><div class="tbl-wrap"><table>
+      <thead><tr><th>Ítem</th><th>Empresa</th><th>Vencimiento</th><th>Estado</th><th>Observaciones</th></tr></thead>
+      <tbody>${items.map(o=>{
+        const cls = o.Estado==="VENCIDA"?"vencida":o.Estado==="SIN REGISTRO"?"sin-registro":"vigente";
+        return `<tr>
+          <td><strong>${o.Item}</strong></td>
+          <td style="font-size:12px">${o.Empresa||"—"}</td>
+          <td style="font-size:12px;font-family:var(--mono)">${o.FechaVencimiento||"—"}</td>
+          <td><span class="badge ${o.Estado==="VENCIDA"?"badge-urgent":o.Estado==="SIN REGISTRO"?"badge-pending":"badge-done"}">${o.Estado}</span></td>
+          <td style="font-size:12px;color:var(--text2)">${o.Observaciones||"—"}</td>
+        </tr>`;}).join("")}
+      </tbody></table></div></div>`;
+}
+
+// ── SERVICIOS ADMIN ───────────────────────────────────────────
+async function renderServiciosAdmin() {
+  document.getElementById("content").innerHTML = `
+    <div class="section-header">
+      <div><div class="section-title">Servicios del sanatorio y PINs de acceso</div><div class="section-sub">Los PINs se gestionan desde Google Sheets. Este listado es de solo lectura.</div></div>
+    </div>
+    <div class="alert alert-info mb-16">Para modificar, agregar o quitar servicios y PINs, acceder directamente a la hoja <strong>Servicios</strong> en Google Sheets.</div>
+    <div id="servicios-table"><div class="text-muted">Cargando...</div></div>`;
+
+  const data = await api({ action:"getServicios" });
+  const servicios = Array.isArray(data) && data.length>0 ? data : [
+    {PIN:"10001",NombreServicio:"Guardia",Sector:"Urgencias",Estado:"Activo"},
+    {PIN:"10002",NombreServicio:"Enfermería Planta Baja",Sector:"Internación",Estado:"Activo"},
+    {PIN:"10003",NombreServicio:"Enfermería 1° Piso",Sector:"Internación",Estado:"Activo"},
+    {PIN:"10004",NombreServicio:"Quirófano",Sector:"Cirugía",Estado:"Activo"},
+    {PIN:"10005",NombreServicio:"Laboratorio",Sector:"Diagnóstico",Estado:"Activo"},
+    {PIN:"10006",NombreServicio:"Diagnóstico por Imágenes",Sector:"Diagnóstico",Estado:"Activo"},
+    {PIN:"10007",NombreServicio:"Administración",Sector:"Gestión",Estado:"Activo"},
+    {PIN:"10008",NombreServicio:"Dirección",Sector:"Gestión",Estado:"Activo"},
+    {PIN:"10009",NombreServicio:"Cocina",Sector:"Servicios",Estado:"Activo"},
+    {PIN:"10010",NombreServicio:"Farmacia",Sector:"Medicamentos",Estado:"Activo"},
+  ];
+
+  document.getElementById("servicios-table").innerHTML = `
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>PIN</th><th>Servicio</th><th>Sector</th><th>Estado</th></tr></thead>
+      <tbody>${servicios.map(s=>`<tr>
+        <td class="text-mono" style="font-size:15px;letter-spacing:.15em">${s.PIN}</td>
+        <td><strong>${s.NombreServicio}</strong></td>
+        <td>${s.Sector||""}</td>
+        <td><span class="badge ${s.Estado==="Activo"?"badge-done":"badge-off"}">${s.Estado}</span></td>
+      </tr>`).join("")}</tbody>
+    </table></div>`;
+}
+
+// ── REQUERIMIENTOS PERSONAL ──────────────────────────────────
+function renderRequerimientosPersonal() {
+  document.getElementById("content").innerHTML = `
+    <div class="section-header"><div class="section-title">Mis requerimientos personales</div></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Nuevo requerimiento</div>
+        <div class="form-group"><label class="form-label">Tipo *</label>
+          <select id="req-tipo">
+            <option value="Ausencia">Ausencia / enfermedad</option>
+            <option value="Vacaciones">Solicitud de vacaciones</option>
+            <option value="Cambio de guardia">Cambio de guardia</option>
+            <option value="Licencia">Licencia especial</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Fecha desde</label><input id="req-desde" type="date"></div>
+        <div class="form-group"><label class="form-label">Fecha hasta</label><input id="req-hasta" type="date"></div>
+        <div class="form-group"><label class="form-label">Detalle / motivo</label><textarea id="req-detalle" placeholder="Describir el motivo o detalle del requerimiento..."></textarea></div>
+        <button class="btn btn-primary" onclick="enviarRequerimiento()">📋 Enviar requerimiento</button>
+      </div>
+      <div class="card" id="mis-reqs">
+        <div class="card-title">Mis requerimientos enviados</div>
+        <div class="text-muted" style="font-size:13px">Cargando...</div>
+      </div>
+    </div>`;
+  cargarMisRequerimientos();
+}
+
+async function enviarRequerimiento() {
+  const tipo = document.getElementById("req-tipo").value;
+  const detalle = document.getElementById("req-detalle").value.trim();
+  const desde = document.getElementById("req-desde").value;
+  const hasta = document.getElementById("req-hasta").value;
+  const res = await api({ action:"nuevoRequerimiento", operario:state.nombre, tipo, detalle, fechaDesde:desde, fechaHasta:hasta });
+  if (res && res.ok !== false) { showAlert("success","✓ Requerimiento enviado"); cargarMisRequerimientos(); }
+  else showAlert("danger","Error al enviar");
+}
+
+async function cargarMisRequerimientos() {
+  const el = document.getElementById("mis-reqs");
+  if (!el) return;
+  const data = await api({ action:"getRequerimientos" });
+  const items = Array.isArray(data) ? data.filter(r=>r.Operario===state.nombre) : [];
+  el.innerHTML = `<div class="card-title">Mis requerimientos enviados</div>` +
+    (items.length===0 ? `<div class="text-muted">Sin requerimientos enviados.</div>` :
+    items.map(r=>`<div style="padding:9px 0;border-bottom:1px solid rgba(45,125,210,.08)">
+      <div style="font-size:11px;color:var(--text3)">${r.Fecha||""} · <em>${r.Tipo||""}</em></div>
+      <div style="font-size:13px;margin:2px 0">${r.Detalle||""}</div>
+      <span class="badge ${r.Estado==="Aprobado"?"badge-done":r.Estado==="Rechazado"?"badge-urgent":"badge-pending"}">${r.Estado||"Pendiente"}</span>
+      ${r.Respuesta?`<div style="font-size:12px;color:var(--text2);margin-top:3px">Respuesta: ${r.Respuesta}</div>`:""}
+    </div>`).join(""));
+}
+
+async function renderReqPersonalAdmin() {
+  document.getElementById("content").innerHTML = `
+    <div class="section-header"><div class="section-title">Requerimientos del personal</div></div>
+    <div id="req-admin-table"><div class="text-muted">Cargando...</div></div>`;
+
+  const data = await api({ action:"getRequerimientos" });
+  const items = Array.isArray(data) ? data : [];
+  document.getElementById("req-admin-table").innerHTML = items.length===0
+    ? `<div class="text-muted">No hay requerimientos pendientes.</div>`
+    : `<div class="tbl-wrap"><table>
+      <thead><tr><th>Fecha</th><th>Operario</th><th>Tipo</th><th>Desde</th><th>Hasta</th><th>Detalle</th><th>Estado</th><th>Acción</th></tr></thead>
+      <tbody>${items.map(r=>`<tr>
+        <td style="font-size:12px">${r.Fecha||""}</td>
+        <td>${r.Operario||""}</td>
+        <td><span class="badge badge-info">${r.Tipo||""}</span></td>
+        <td style="font-size:12px">${r.FechaDesde||""}</td>
+        <td style="font-size:12px">${r.FechaHasta||""}</td>
+        <td style="font-size:12px;max-width:160px">${r.Detalle||""}</td>
+        <td><span class="badge ${r.Estado==="Aprobado"?"badge-done":r.Estado==="Rechazado"?"badge-urgent":"badge-pending"}">${r.Estado}</span></td>
+        <td>${r.Estado==="Pendiente"?`<button class='btn btn-success btn-sm' onclick="respReq('${r.ID}','Aprobado')">✓</button> <button class='btn btn-danger btn-sm' onclick="respReq('${r.ID}','Rechazado')">✗</button>`:"—"}</td>
+      </tr>`).join("")}</tbody></table></div>`;
+}
+
+async function respReq(id, estado) {
+  const resp = estado==="Rechazado" ? prompt("Motivo del rechazo (opcional):") || "" : "";
+  const res = await api({ action:"responderRequerimiento", id, estado, respuesta:resp });
+  if (res && res.ok !== false) { showAlert("success","✓ Requerimiento "+estado.toLowerCase()); renderReqPersonalAdmin(); }
+}
+
+// ── INIT ─────────────────────────────────────────────────────
+document.addEventListener("keydown", e => {
+  if (document.getElementById("login-screen").style.display !== "none") {
+    if (e.key >= "0" && e.key <= "9") pinPress(parseInt(e.key));
+    if (e.key === "Backspace" || e.key === "Delete") { state.pinBuffer = state.pinBuffer.slice(0,-1); renderPinDisplay(); }
+    if (e.key === "Enter") attemptLogin();
+  }
+});
+renderPinDisplay();
+</script>
+</body>
+</html>
