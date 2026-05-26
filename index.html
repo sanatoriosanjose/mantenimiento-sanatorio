@@ -684,11 +684,12 @@ function drawCharts(stats) {
 
 // ── PEDIDO (SERVICIOS) ───────────────────────────────────────
 function renderPedido() {
-  if(state.noOxigeno) {
-    document.getElementById("content").innerHTML = `
-      <div class="alert alert-warning">⚠ Para pedidos relacionados con oxígeno y tubos, contactar directamente al supervisor.</div>`;
-  }
-  document.getElementById("content").innerHTML += `
+  const warningBar = state.noOxigeno
+    ? `<div class="alert alert-warning mb-16">⚠ Para pedidos relacionados con oxígeno y tubos, contactar directamente al supervisor.</div>`
+    : "";
+  document.getElementById("content").innerHTML = `
+    ${warningBar}
+    <div id="pedido-msg"></div>
     <div class="card" style="max-width:560px">
       <div class="card-title">Solicitud de intervención de mantenimiento</div>
       <div class="alert alert-info mb-16">Servicio: <strong>${state.servicio || state.nombre}</strong></div>
@@ -719,7 +720,13 @@ function renderPedido() {
 async function enviarPedido() {
   const nombre = document.getElementById("f-nombre").value.trim();
   const desc = document.getElementById("f-desc").value.trim();
-  if (!nombre || !desc) { showAlert("warning","Completar nombre y descripción"); return; }
+  if (!nombre || !desc) {
+    mostrarMsgPedido("warning", "⚠ Completar nombre y descripción antes de enviar.");
+    return;
+  }
+
+  const btn = document.querySelector("button[onclick='enviarPedido()']");
+  if (btn) { btn.disabled = true; btn.textContent = "Enviando..."; }
 
   const res = await api({
     action:"nuevoPedido",
@@ -728,14 +735,25 @@ async function enviarPedido() {
     descripcion: desc + (document.getElementById("f-sector").value ? " — Sector: "+document.getElementById("f-sector").value : ""),
     urgencia: document.getElementById("f-urg").value,
   });
+
+  if (btn) { btn.disabled = false; btn.innerHTML = "📋 Enviar solicitud"; }
+
   if (res && res.ok !== false) {
-    showAlert("success", "✓ Pedido registrado correctamente. Ref: " + (res.id || "OK"));
+    mostrarMsgPedido("success", "✓ Pedido registrado correctamente. Referencia: " + (res.id || "OK"));
     document.getElementById("f-nombre").value = "";
     document.getElementById("f-desc").value = "";
     document.getElementById("f-sector").value = "";
   } else {
-    showAlert("danger","Error al enviar: " + (res?.error || "verificar conexión"));
+    mostrarMsgPedido("danger", "✗ Error al enviar: " + (res?.error || "verificar conexión con el servidor"));
   }
+}
+
+function mostrarMsgPedido(tipo, texto) {
+  const el = document.getElementById("pedido-msg");
+  if (!el) return;
+  el.innerHTML = `<div class="alert alert-${tipo}" style="max-width:560px">${texto}</div>`;
+  el.scrollIntoView({ behavior:"smooth", block:"nearest" });
+  if (tipo === "success") setTimeout(() => { el.innerHTML = ""; }, 5000);
 }
 
 // ── COLA DE PEDIDOS (OPERARIOS) ──────────────────────────────
