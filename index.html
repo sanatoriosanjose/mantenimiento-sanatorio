@@ -322,7 +322,7 @@ tr:hover td { background: rgba(45,125,210,.05); }
     </div>
     <div id="login-error" class="login-error"></div>
     <div style="text-align:center;margin-top:12px">
-      <span style="font-size:11px;color:var(--text3)">Demo: Servicio=10001 | Operario=20001 | Supervisor=30001 | Director=40001</span>
+      <span style="font-size:11px;color:var(--text3)">Demo: Servicio=10001 | Operario=20001 | Jefe=30001 | Director=40001</span>
     </div>
   </div>
 </div>
@@ -665,7 +665,7 @@ function logout() {
 
 function roleLabel(r) {
   return { servicio:"Servicio del sanatorio", operario:"Operario de mantenimiento",
-    supervisor:"Jefe de mantenimiento", director:"Dirección" }[r] || r;
+    supervisor:"Jefe de Mantenimiento", director:"Dirección" }[r] || r;
 }
 
 // ── NAV ──────────────────────────────────────────────────────
@@ -699,7 +699,7 @@ function buildNav() {
 
   if (r === "supervisor") {
     sections.push({
-      label: "Supervisión",
+      label: "Jefe de Mantenimiento",
       items: [
         { id:"pedido_supervisor", icon:"➕", label:"Crear pedido de trabajo" },
         { id:"tablero_supervisor", icon:"📌", label:"Tablero de novedades" },
@@ -843,7 +843,7 @@ async function publicarTablero() {
   if (btn) { btn.disabled = true; btn.textContent = "Publicando..."; }
   const res = await api({
     action: "nuevaNovedad",
-    turno: "Supervisor",
+    turno: "Jefe de Mantenimiento",
     operario: state.nombre,
     novedad: texto,
     tipo: document.getElementById("tb-tipo").value + (document.getElementById("tb-hasta").value ? " · Vigente hasta: " + document.getElementById("tb-hasta").value : ""),
@@ -871,7 +871,7 @@ async function cargarTablero() {
   if (!lista) return;
   const data = await api({ action:"getNovedades" });
   const items = Array.isArray(data)
-    ? data.filter(n => n.Turno === "Supervisor").reverse()
+    ? data.filter(n => n.Turno === "Jefe de Mantenimiento").reverse()
     : [];
 
   const iconos = { "Instrucción":"📋","Alerta":"🔴","Información":"ℹ️","Recordatorio":"🔔","Urgente":"🚨" };
@@ -911,7 +911,7 @@ async function renderPedidoSupervisor() {
     <div id="sup-pedido-msg"></div>
     <div class="card" style="max-width:600px">
       <div class="card-title">Crear pedido de trabajo</div>
-      <div class="alert alert-info mb-16">Creado por: <strong>${state.nombre}</strong> — Supervisor</div>
+      <div class="alert alert-info mb-16">Creado por: <strong>${state.nombre}</strong> — Jefe de Mantenimiento</div>
 
       <div class="form-group">
         <label class="form-label">Descripción del trabajo *</label>
@@ -1053,14 +1053,14 @@ async function renderDashboard() {
   // Novedades del supervisor (tablero) — se muestran primero y destacadas
   if (novedades && Array.isArray(novedades)) {
     const strip = document.getElementById("novedades-strip");
-    const deSuper = novedades.filter(n => n.Turno === "Supervisor").slice(-3).reverse();
-    const deOperarios = novedades.filter(n => n.Turno !== "Supervisor").slice(-3).reverse();
+    const deSuper = novedades.filter(n => n.Turno === "Jefe de Mantenimiento").slice(-3).reverse();
+    const deOperarios = novedades.filter(n => n.Turno !== "Jefe de Mantenimiento").slice(-3).reverse();
     let html = "";
 
     if (deSuper.length > 0) {
       const iconos = {"Instrucción":"📋","Alerta":"🔴","Información":"ℹ️","Recordatorio":"🔔","Urgente":"🚨"};
       html += `<div class="novedad-strip" style="border-color:rgba(15,184,201,.4);background:rgba(15,184,201,.06);margin-bottom:10px">
-        <div class="novedad-strip-title" style="color:var(--cyan)">📌 Novedades del jefe de mantenimiento</div>
+        <div class="novedad-strip-title" style="color:var(--cyan)">📌 Novedades del Jefe de Mantenimiento</div>
         ${deSuper.map(n=>{
           const tipo = (n.Tipo||"").split(" ·")[0];
           const icono = iconos[tipo] || "📌";
