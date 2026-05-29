@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mantenimiento — Sanatorio</title>
+<title>Mantenimiento — Sanatorio v2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -1130,7 +1130,7 @@ async function guardarRonda06() {
     const alertas = [];
     Object.entries(stock).forEach(([tipo, cant]) => {
       if (STOCK_MINIMO[tipo] && cant < STOCK_MINIMO[tipo]) {
-        alertas.push(`\${tipo}: \${cant} (mínimo: \${STOCK_MINIMO[tipo]})`);
+        alertas.push(`${tipo}: ${cant} (mínimo: ${STOCK_MINIMO[tipo]})`);
       }
     });
 
@@ -1142,11 +1142,11 @@ async function guardarRonda06() {
       setTimeout(() => {
         const msgEl = document.getElementById('gas-msg');
         if (msgEl) {
-          msgEl.innerHTML += `<div style="margin-top:12px">
-            <a href="mailto:\${EMAIL_CASCIA}?subject=Solicitud%20de%20reposici%C3%B3n%20de%20tubos%20de%20gases&body=Estimado%20equipo%20CASCIA%2C%0A%0ASe%20solicita%20la%20reposici%C3%B3n%20de%20los%20siguientes%20gases%3A%0A\${encodeURIComponent(alertas.join('%0A'))}%0A%0AQuedamos%20a%20disposici%C3%B3n.%0A%0ASanatorio%20San%20Jos%C3%A9%0AMantenimiento&reply-to=\${EMAIL_RESPUESTA}"
-              class="btn btn-warning" target="_blank">
-              📧 Enviar correo a CASCIA solicitando reposición
-            </a></div>`;
+          msgEl.innerHTML += '<div style="margin-top:12px">' +
+            '<a href="mailto:' + EMAIL_CASCIA + '?subject=Solicitud%20de%20reposicion%20tubos' +
+            '&body=Estimado%20equipo%20CASCIA%2C%0ASe%20solicita%20reposicion%20de%20gases.%0AQuedamos%20a%20disposicion.%0ASanatorio%20San%20Jose%0AMantenimiento' +
+            '&reply-to=' + EMAIL_RESPUESTA + '" class="btn btn-warning" target="_blank">' +
+            '📧 Enviar correo a CASCIA solicitando reposición</a></div>';
         }
       }, 100);
     } else {
@@ -1274,9 +1274,9 @@ async function cargarHistorialTubos() {
     (items.length === 0 ? '<div class="text-muted">Sin movimientos registrados hoy.</div>' :
     items.map(m => `
       <div style="padding:8px 0;border-bottom:1px solid rgba(45,125,210,.08)">
-        <div style="font-size:11px;color:var(--text3)">\${m.Hora||''} · \${iconMov[m.TipoMovimiento]||''} \${m.TipoMovimiento||''} · \${m.Operario||''}</div>
-        <div style="font-size:13px;margin:2px 0"><strong>\${m.TipoGas||''}</strong> · Cód: <span style="font-family:var(--mono)">\${m.CodigoTubo||''}</span>\${m.Capacidad ? ' · '+m.Capacidad : ''}</div>
-        \${m.Destino ? `<div style="font-size:12px;color:var(--text2)">Destino: \${m.Destino}\${m.Camillero ? ' · Camillero: '+m.Camillero : ''}</div>` : ''}
+        <div style="font-size:11px;color:var(--text3)">${m.Hora||''} · ${iconMov[m.TipoMovimiento]||''} ${m.TipoMovimiento||''} · ${m.Operario||''}</div>
+        <div style="font-size:13px;margin:2px 0"><strong>${m.TipoGas||''}</strong> · Cód: <span style="font-family:var(--mono)">${m.CodigoTubo||''}</span>${m.Capacidad ? ' · '+m.Capacidad : ''}</div>
+        ${m.Destino ? `<div style="font-size:12px;color:var(--text2)">Destino: ${m.Destino}${m.Camillero ? ' · Camillero: '+m.Camillero : ''}</div>` : ''}
       </div>`).join(''));
 }
 
@@ -1372,7 +1372,7 @@ async function guardarCargaTanque() {
 
   if (res && res.ok !== false) {
     mostrarGasMsg('success',
-      `✓ Carga registrada. Cantidad: \${cargado.toFixed(0)} unidades · Remito: \${remito}\n⚠ Recordar entregar el remito físico al Jefe de Mantenimiento.`);
+      `✓ Carga registrada. Cantidad: ${cargado.toFixed(0)} unidades · Remito: ${remito}\n⚠ Recordar entregar el remito físico al Jefe de Mantenimiento.`);
     ['c-chofer','c-patente','c-antes','c-despues','c-remito','c-obs'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
@@ -1387,50 +1387,63 @@ async function renderGasStock(c) {
   c.innerHTML = '<div class="text-muted">Cargando stock...</div>';
   const data = await api({ action: 'getStockGas' });
 
-  const stock = data && data.ok !== false && data.stock ? data.stock : {
-    'Oxígeno medicinal': '—', 'Aire comprimido': '—', 'CO2': '—', 'Oxígeno transporte (camillero)': '—'
-  };
-  const ultimaRonda = data && data.ultimaRonda ? data.ultimaRonda : null;
+  const stock = (data && data.ok !== false && data.stock) ? data.stock : {};
+  const ultimaRonda = (data && data.ultimaRonda) ? data.ultimaRonda : null;
 
-  const items = Object.entries(STOCK_MINIMO).map(([tipo, minimo]) => {
-    const cant = parseInt(stock[tipo]) || 0;
+  const items = Object.entries(STOCK_MINIMO).map(function(entry) {
+    const tipo = entry[0]; const minimo = entry[1];
+    const cant = parseInt(stock[tipo]);
     const ok = !isNaN(cant) && cant >= minimo;
     const badge = isNaN(cant) ? 'badge-info' : ok ? 'badge-done' : 'badge-urgent';
     const label = isNaN(cant) ? 'Sin datos' : ok ? 'OK' : 'BAJO';
     return { tipo, cant, minimo, badge, label, ok };
   });
 
-  const hayBajos = items.some(i => !i.ok && !isNaN(i.cant));
+  const hayBajos = items.some(function(i) { return !i.ok && !isNaN(i.cant); });
 
-  c.innerHTML = `
-    \${hayBajos ? `<div class="alert alert-warning mb-16">⚠ Hay gases por debajo del stock mínimo.
-      <a href="mailto:\${EMAIL_CASCIA}?subject=Solicitud%20de%20reposici%C3%B3n%20de%20tubos&body=Estimado%20equipo%20CASCIA%2C%0A%0ASe%20solicita%20la%20reposici%C3%B3n%20de%20gases.%0A%0AQuedamos%20a%20disposici%C3%B3n.%0A%0ASanatorio%20San%20Jos%C3%A9%0AMantenimiento&reply-to=\${EMAIL_RESPUESTA}"
-        class="btn btn-warning btn-sm" style="margin-left:12px" target="_blank">📧 Enviar correo a CASCIA</a>
-    </div>` : ''}
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-title">📦 Stock de tubos</div>
-        \${ultimaRonda ? `<div style="font-size:11px;color:var(--text2);margin-bottom:12px">Última ronda: \${ultimaRonda}</div>` : ''}
-        <table style="width:100%;font-size:13px">
-          <thead><tr>
-            <th style="text-align:left;padding:8px 6px;font-size:11px;color:var(--text2);text-transform:uppercase">Gas</th>
-            <th style="text-align:center;padding:8px 6px;font-size:11px;color:var(--text2);text-transform:uppercase">Actual</th>
-            <th style="text-align:center;padding:8px 6px;font-size:11px;color:var(--text2);text-transform:uppercase">Mínimo</th>
-            <th style="text-align:center;padding:8px 6px;font-size:11px;color:var(--text2);text-transform:uppercase">Estado</th>
-          </tr></thead>
-          <tbody>\${items.map(i => `<tr>
-            <td style="padding:10px 6px"><strong>\${i.tipo}</strong></td>
-            <td style="text-align:center;font-family:var(--mono);font-size:18px;padding:10px 6px;color:\${i.ok?'var(--green)':'var(--red)'}">\${isNaN(parseInt(stock[i.tipo]))?'—':i.cant}</td>
-            <td style="text-align:center;font-family:var(--mono);padding:10px 6px;color:var(--text2)">\${i.minimo}</td>
-            <td style="text-align:center;padding:10px 6px"><span class="badge \${i.badge}">\${i.label}</span></td>
-          </tr>`).join('')}</tbody>
-        </table>
-      </div>
-      <div class="card" id="gas-historial-rondas">
-        <div class="card-title">📈 Últimas lecturas del tanque</div>
-        <div class="text-muted">Cargando...</div>
-      </div>
-    </div>`;
+  let alertaHtml = '';
+  if (hayBajos) {
+    alertaHtml = '<div class="alert alert-warning mb-16">⚠ Hay gases por debajo del stock mínimo. ' +
+      '<a href="mailto:' + EMAIL_CASCIA + '?subject=Solicitud%20de%20reposici%C3%B3n%20de%20tubos' +
+      '&body=Estimado%20equipo%20CASCIA%2C%0A%0ASe%20solicita%20la%20reposici%C3%B3n%20de%20gases.%0A%0AQuedamos%20a%20disposici%C3%B3n.%0A%0ASanatorio%20San%20Jos%C3%A9%0AMantenimiento' +
+      '&reply-to=' + EMAIL_RESPUESTA + '" ' +
+      'class="btn btn-warning btn-sm" style="margin-left:12px" target="_blank">📧 Enviar correo a CASCIA</a></div>';
+  }
+
+  let filasStock = '';
+  items.forEach(function(i) {
+    const cantDisplay = isNaN(parseInt(stock[i.tipo])) ? '—' : i.cant;
+    const color = i.ok ? 'var(--green)' : 'var(--red)';
+    filasStock += '<tr>' +
+      '<td style="padding:10px 6px"><strong>' + i.tipo + '</strong></td>' +
+      '<td style="text-align:center;font-family:var(--mono);font-size:18px;padding:10px 6px;color:' + color + '">' + cantDisplay + '</td>' +
+      '<td style="text-align:center;font-family:var(--mono);padding:10px 6px;color:var(--text2)">' + i.minimo + '</td>' +
+      '<td style="text-align:center;padding:10px 6px"><span class="badge ' + i.badge + '">' + i.label + '</span></td>' +
+      '</tr>';
+  });
+
+  const rondaInfo = ultimaRonda ? '<div style="font-size:11px;color:var(--text2);margin-bottom:12px">Última ronda: ' + ultimaRonda + '</div>' : '';
+
+  c.innerHTML = alertaHtml +
+    '<div class="grid-2">' +
+      '<div class="card">' +
+        '<div class="card-title">📦 Stock de tubos</div>' +
+        rondaInfo +
+        '<table style="width:100%;font-size:13px">' +
+          '<thead><tr>' +
+            '<th style="text-align:left;padding:8px 6px;font-size:11px;color:var(--text2);text-transform:uppercase">Gas</th>' +
+            '<th style="text-align:center;padding:8px 6px;font-size:11px;color:var(--text2);text-transform:uppercase">Actual</th>' +
+            '<th style="text-align:center;padding:8px 6px;font-size:11px;color:var(--text2);text-transform:uppercase">Mínimo</th>' +
+            '<th style="text-align:center;padding:8px 6px;font-size:11px;color:var(--text2);text-transform:uppercase">Estado</th>' +
+          '</tr></thead>' +
+          '<tbody>' + filasStock + '</tbody>' +
+        '</table>' +
+      '</div>' +
+      '<div class="card" id="gas-historial-rondas">' +
+        '<div class="card-title">📈 Últimas lecturas del tanque</div>' +
+        '<div class="text-muted">Cargando...</div>' +
+      '</div>' +
+    '</div>';
   cargarHistorialRondasGas();
 }
 
@@ -1444,17 +1457,17 @@ async function cargarHistorialRondasGas() {
     items.map(r => `
       <div style="padding:8px 0;border-bottom:1px solid rgba(45,125,210,.08);display:flex;justify-content:space-between;align-items:center">
         <div>
-          <div style="font-size:12px;color:var(--text2)">\${r.Fecha||''} \${r.Hora||''} · \${r.Operario||''}</div>
-          \${r.Observaciones ? `<div style="font-size:11px;color:var(--text3);margin-top:1px">\${r.Observaciones}</div>` : ''}
+          <div style="font-size:12px;color:var(--text2)">${r.Fecha||''} ${r.Hora||''} · ${r.Operario||''}</div>
+          ${r.Observaciones ? `<div style="font-size:11px;color:var(--text3);margin-top:1px">${r.Observaciones}</div>` : ''}
         </div>
-        <div style="font-family:var(--mono);font-size:22px;color:var(--cyan);margin-left:12px">\${r.NivelTanque||'—'}</div>
+        <div style="font-family:var(--mono);font-size:22px;color:var(--cyan);margin-left:12px">${r.NivelTanque||'—'}</div>
       </div>`).join(''));
 }
 
 function mostrarGasMsg(tipo, texto) {
   const el = document.getElementById('gas-msg');
   if (!el) return;
-  el.innerHTML = `<div class="alert alert-\${tipo}" style="max-width:580px;white-space:pre-line">\${texto}</div>`;
+  el.innerHTML = `<div class="alert alert-${tipo}" style="max-width:580px;white-space:pre-line">${texto}</div>`;
   if (tipo === 'success') setTimeout(() => { el.innerHTML = ''; }, 6000);
 }
 
