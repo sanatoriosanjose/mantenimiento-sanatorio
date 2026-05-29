@@ -692,6 +692,7 @@ function buildNav() {
         { id:"ronda", icon:"🚶", label:"Realizar ronda" },
         { id:"trabajo_propio", icon:"🔨", label:"Trabajo propio" },
         { id:"novedades", icon:"📝", label:"Novedades de turno" },
+        { id:"oxigeno", icon:"🫧", label:"Gestión de gases" },
 
       ]
     });
@@ -703,6 +704,7 @@ function buildNav() {
       items: [
         { id:"pedido_supervisor", icon:"➕", label:"Crear pedido de trabajo" },
         { id:"tablero_supervisor", icon:"📌", label:"Tablero de novedades" },
+        { id:"oxigeno", icon:"🫧", label:"Gestión de gases" },
         { id:"personal", icon:"👥", label:"Nómina personal" },
         { id:"req_personal_admin", icon:"📅", label:"Solicitudes del personal" },
         { id:"proveedores", icon:"📞", label:"Proveedores" },
@@ -753,6 +755,7 @@ function navigate(page) {
     req_personal_admin:"Solicitudes del personal", requerimientos_personal:"Mis solicitudes",
     pedido_supervisor:"Crear pedido de trabajo",
     tablero_supervisor:"Tablero de novedades del jefe",
+    oxigeno:"Gestión de gases — Oxígeno y tubos",
   };
   document.getElementById("topbar-title").textContent = titles[page] || page;
 
@@ -772,6 +775,7 @@ function navigate(page) {
     requerimientos_personal: renderRequerimientosPersonal,
     pedido_supervisor: renderPedidoSupervisor,
     tablero_supervisor: renderTableroSupervisor,
+    oxigeno: renderOxigeno,
   };
   if (pages[page]) pages[page]();
 }
@@ -1010,6 +1014,448 @@ function mostrarMsgSupPedido(tipo, texto) {
   if (!el) return;
   el.innerHTML = `<div class="alert alert-${tipo}" style="max-width:600px">${texto}</div>`;
   if (tipo === "success") setTimeout(() => { el.innerHTML = ""; }, 6000);
+}
+
+
+// ── GESTIÓN DE GASES ─────────────────────────────────────────
+const STOCK_MINIMO = {
+  "Oxígeno medicinal": 6,
+  "Aire comprimido": 3,
+  "CO2": 2,
+  "Oxígeno transporte (camillero)": 3,
+};
+const EMAIL_CASCIA = "rodrigo.rivas@casciagases.com.ar";
+const EMAIL_RESPUESTA = "mantenimiento@sanatoriosanjose.org.ar";
+
+async function renderOxigeno() {
+  document.getElementById("content").innerHTML = `
+    <div class="section-header">
+      <div><div class="section-title">Gestión de gases</div>
+      <div class="section-sub">Oxígeno líquido · Tubos · Movimientos</div></div>
+    </div>
+    <div class="tabs" id="gas-tabs">
+      <button class="tab-btn active" onclick="gasTab('ronda06')">🕕 Ronda 06:00</button>
+      <button class="tab-btn" onclick="gasTab('tubos')">🔵 Movimiento tubos</button>
+      <button class="tab-btn" onclick="gasTab('carga')">🚚 Carga de tanque</button>
+      <button class="tab-btn" onclick="gasTab('stock')">📦 Stock actual</button>
+    </div>
+    <div id="gas-content"></div>
+  `;
+  gasTab('ronda06');
+}
+
+function gasTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  const c = document.getElementById('gas-content');
+  if (tab === 'ronda06') renderGasRonda06(c);
+  else if (tab === 'tubos') renderGasTubos(c);
+  else if (tab === 'carga') renderGasCarga(c);
+  else if (tab === 'stock') renderGasStock(c);
+}
+
+// ── RONDA 06:00 ──────────────────────────────────────────────
+function renderGasRonda06(c) {
+  const ahora = new Date();
+  const hora = ahora.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+  c.innerHTML = `
+    <div id="gas-msg"></div>
+    <div class="card" style="max-width:560px">
+      <div class="card-title">🕕 Registro ronda 06:00 hs</div>
+      <div class="alert alert-info mb-16">Se registra diariamente a las 06:00 hs. Hora actual: <strong>${hora}</strong></div>
+
+      <div class="form-group">
+        <label class="form-label">Lectura reloj oxígeno líquido (nivel del tanque) *</label>
+        <input id="g-nivel" type="number" placeholder="Ej: 321" min="0">
+        <div style="font-size:11px;color:var(--text2);margin-top:3px">Ingresar el valor tal como aparece en el medidor del tanque.</div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px">
+        <div class="card-title" style="margin-bottom:12px">Conteo de tubos</div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Tubos oxígeno medicinal</label>
+            <input id="g-tox" type="number" placeholder="Cantidad" min="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tubos aire comprimido</label>
+            <input id="g-taire" type="number" placeholder="Cantidad" min="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tubos CO2</label>
+            <input id="g-tco2" type="number" placeholder="Cantidad" min="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tubos oxígeno transporte</label>
+            <input id="g-ttrans" type="number" placeholder="Cantidad (camilleros)" min="0">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Observaciones</label>
+        <textarea id="g-obs" placeholder="Anomalías observadas, novedades del área de gases..."></textarea>
+      </div>
+
+      <button class="btn btn-primary" onclick="guardarRonda06()">💾 Registrar ronda 06:00</button>
+    </div>`;
+}
+
+async function guardarRonda06() {
+  const nivel = document.getElementById('g-nivel').value.trim();
+  if (!nivel) { mostrarGasMsg('warning','⚠ Ingresar la lectura del reloj de oxígeno líquido.'); return; }
+
+  const stock = {
+    'Oxígeno medicinal': parseInt(document.getElementById('g-tox').value) || 0,
+    'Aire comprimido': parseInt(document.getElementById('g-taire').value) || 0,
+    'CO2': parseInt(document.getElementById('g-tco2').value) || 0,
+    'Oxígeno transporte (camillero)': parseInt(document.getElementById('g-ttrans').value) || 0,
+  };
+
+  const btn = document.querySelector("button[onclick='guardarRonda06()']");
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+  const res = await api({
+    action: 'registrarRondaGas',
+    operario: state.nombre,
+    nivelTanque: nivel,
+    stockTubos: JSON.stringify(stock),
+    observaciones: document.getElementById('g-obs').value,
+  });
+
+  if (btn) { btn.disabled = false; btn.innerHTML = '💾 Registrar ronda 06:00'; }
+
+  if (res && res.ok !== false) {
+    // Verificar stock mínimo y alertar
+    const alertas = [];
+    Object.entries(stock).forEach(([tipo, cant]) => {
+      if (STOCK_MINIMO[tipo] && cant < STOCK_MINIMO[tipo]) {
+        alertas.push(\`\${tipo}: \${cant} (mínimo: \${STOCK_MINIMO[tipo]})\`);
+      }
+    });
+
+    if (alertas.length > 0) {
+      mostrarGasMsg('warning',
+        '✓ Ronda registrada.\n⚠ STOCK BAJO — Los siguientes tubos están por debajo del mínimo:\n' + alertas.join('\n') +
+        '\n\nSe debe enviar correo a CASCIA solicitando reposición.');
+      // Mostrar botón para enviar correo
+      setTimeout(() => {
+        const msgEl = document.getElementById('gas-msg');
+        if (msgEl) {
+          msgEl.innerHTML += \`<div style="margin-top:12px">
+            <a href="mailto:\${EMAIL_CASCIA}?subject=Solicitud%20de%20reposici%C3%B3n%20de%20tubos%20de%20gases&body=Estimado%20equipo%20CASCIA%2C%0A%0ASe%20solicita%20la%20reposici%C3%B3n%20de%20los%20siguientes%20gases%3A%0A\${encodeURIComponent(alertas.join('%0A'))}%0A%0AQuedamos%20a%20disposici%C3%B3n.%0A%0ASanatorio%20San%20Jos%C3%A9%0AMantenimiento&reply-to=\${EMAIL_RESPUESTA}"
+              class="btn btn-warning" target="_blank">
+              📧 Enviar correo a CASCIA solicitando reposición
+            </a></div>\`;
+        }
+      }, 100);
+    } else {
+      mostrarGasMsg('success', '✓ Ronda 06:00 registrada correctamente. Stock dentro de los mínimos.');
+    }
+    // Limpiar campos
+    ['g-nivel','g-tox','g-taire','g-tco2','g-ttrans','g-obs'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+  } else {
+    mostrarGasMsg('danger', '✗ Error al guardar: ' + (res?.error || 'verificar conexión'));
+  }
+}
+
+// ── MOVIMIENTO DE TUBOS ───────────────────────────────────────
+function renderGasTubos(c) {
+  c.innerHTML = `
+    <div id="gas-msg"></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">🔵 Registrar movimiento de tubo</div>
+        <div class="form-group">
+          <label class="form-label">Tipo de movimiento *</label>
+          <select id="t-mov" onchange="actualizarFormTubo()">
+            <option value="ingreso">📥 Ingreso — tubo LLENO</option>
+            <option value="egreso">📤 Egreso — tubo VACÍO sale</option>
+            <option value="entrega">🚑 Entrega a servicio / camillero</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo de gas *</label>
+          <select id="t-tipo">
+            <option value="Oxígeno medicinal">Oxígeno medicinal</option>
+            <option value="Oxígeno transporte (camillero)">Oxígeno transporte (camillero)</option>
+            <option value="Aire comprimido">Aire comprimido</option>
+            <option value="CO2">CO2</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Código del tubo *</label>
+          <input id="t-codigo" type="text" placeholder="Ej: OX-2247">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Capacidad del tubo</label>
+          <input id="t-capacidad" type="text" placeholder="Ej: 10 m³ / 50 L">
+        </div>
+        <div id="t-extra" class="form-group" style="display:none">
+          <label class="form-label">Destino / Servicio *</label>
+          <input id="t-destino" type="text" placeholder="Ej: UTI, Quirófano, Camilla 3">
+        </div>
+        <div id="t-camillero" class="form-group" style="display:none">
+          <label class="form-label">Nombre del camillero</label>
+          <input id="t-nombre-camillero" type="text" placeholder="Apellido y nombre de quien retira">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Observaciones</label>
+          <input id="t-obs" type="text" placeholder="Observaciones adicionales">
+        </div>
+        <button class="btn btn-primary" onclick="guardarMovTubo()">💾 Registrar movimiento</button>
+      </div>
+      <div class="card" id="tubos-historial">
+        <div class="card-title">Últimos movimientos del día</div>
+        <div class="text-muted">Cargando...</div>
+      </div>
+    </div>`;
+  cargarHistorialTubos();
+}
+
+function actualizarFormTubo() {
+  const mov = document.getElementById('t-mov').value;
+  const extra = document.getElementById('t-extra');
+  const camillero = document.getElementById('t-camillero');
+  if (mov === 'entrega') {
+    extra.style.display = 'block';
+    camillero.style.display = 'block';
+  } else {
+    extra.style.display = 'none';
+    camillero.style.display = 'none';
+  }
+}
+
+async function guardarMovTubo() {
+  const codigo = document.getElementById('t-codigo').value.trim();
+  const tipo = document.getElementById('t-tipo').value;
+  const mov = document.getElementById('t-mov').value;
+  if (!codigo) { mostrarGasMsg('warning','⚠ Ingresar el código del tubo.'); return; }
+
+  const btn = document.querySelector("button[onclick='guardarMovTubo()']");
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+  const res = await api({
+    action: 'registrarMovTubo',
+    operario: state.nombre,
+    tipoMovimiento: mov,
+    tipoGas: tipo,
+    codigoTubo: codigo,
+    capacidad: document.getElementById('t-capacidad').value,
+    destino: document.getElementById('t-destino')?.value || '',
+    camillero: document.getElementById('t-nombre-camillero')?.value || '',
+    observaciones: document.getElementById('t-obs').value,
+  });
+
+  if (btn) { btn.disabled = false; btn.innerHTML = '💾 Registrar movimiento'; }
+
+  if (res && res.ok !== false) {
+    mostrarGasMsg('success', '✓ Movimiento registrado. Ref: ' + (res.id || 'OK'));
+    ['t-codigo','t-capacidad','t-destino','t-nombre-camillero','t-obs'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    cargarHistorialTubos();
+  } else {
+    mostrarGasMsg('danger', '✗ Error: ' + (res?.error || 'verificar conexión'));
+  }
+}
+
+async function cargarHistorialTubos() {
+  const el = document.getElementById('tubos-historial');
+  if (!el) return;
+  const data = await api({ action: 'getMovTubos' });
+  const hoy = new Date().toLocaleDateString('es-AR');
+  const items = Array.isArray(data) ? data.filter(d => d.Fecha === hoy).slice(-10).reverse() : [];
+  const iconMov = { ingreso:'📥', egreso:'📤', entrega:'🚑' };
+  el.innerHTML = '<div class="card-title">Últimos movimientos del día</div>' +
+    (items.length === 0 ? '<div class="text-muted">Sin movimientos registrados hoy.</div>' :
+    items.map(m => \`
+      <div style="padding:8px 0;border-bottom:1px solid rgba(45,125,210,.08)">
+        <div style="font-size:11px;color:var(--text3)">\${m.Hora||''} · \${iconMov[m.TipoMovimiento]||''} \${m.TipoMovimiento||''} · \${m.Operario||''}</div>
+        <div style="font-size:13px;margin:2px 0"><strong>\${m.TipoGas||''}</strong> · Cód: <span style="font-family:var(--mono)">\${m.CodigoTubo||''}</span>\${m.Capacidad ? ' · '+m.Capacidad : ''}</div>
+        \${m.Destino ? \`<div style="font-size:12px;color:var(--text2)">Destino: \${m.Destino}\${m.Camillero ? ' · Camillero: '+m.Camillero : ''}</div>\` : ''}
+      </div>\`).join(''));
+}
+
+// ── CARGA DE TANQUE ───────────────────────────────────────────
+function renderGasCarga(c) {
+  c.innerHTML = \`
+    <div id="gas-msg"></div>
+    <div class="card" style="max-width:580px">
+      <div class="card-title">🚚 Registro de carga de tanque — CASCIA</div>
+      <div class="alert alert-info mb-16">Completar cuando llega el camión de oxígeno líquido. El remito debe entregarse al Jefe de Mantenimiento.</div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Nombre del chofer *</label>
+          <input id="c-chofer" type="text" placeholder="Apellido y nombre">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Dominio / Patente del vehículo *</label>
+          <input id="c-patente" type="text" placeholder="Ej: AB 123 CD" style="text-transform:uppercase">
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Nivel ANTES de la carga *</label>
+          <input id="c-antes" type="number" placeholder="Ej: 180" min="0" oninput="calcCarga()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nivel DESPUÉS de la carga *</label>
+          <input id="c-despues" type="number" placeholder="Ej: 850" min="0" oninput="calcCarga()">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Cantidad cargada (calculada automáticamente)</label>
+        <div id="c-cargado" style="font-family:var(--mono);font-size:22px;color:var(--cyan);padding:10px;background:var(--navy3);border-radius:6px;text-align:center">—</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Número de remito *</label>
+        <input id="c-remito" type="text" placeholder="Ej: 0001-00045678">
+        <div style="font-size:11px;color:var(--amber);margin-top:3px">⚠ El remito físico debe ser entregado al Jefe de Mantenimiento.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Observaciones</label>
+        <textarea id="c-obs" placeholder="Novedades del servicio, condiciones de la carga..."></textarea>
+      </div>
+
+      <button class="btn btn-success" onclick="guardarCargaTanque()">💾 Registrar carga de tanque</button>
+    </div>\`;
+}
+
+function calcCarga() {
+  const antes = parseFloat(document.getElementById('c-antes').value) || 0;
+  const despues = parseFloat(document.getElementById('c-despues').value) || 0;
+  const el = document.getElementById('c-cargado');
+  if (antes > 0 && despues > 0 && despues > antes) {
+    el.textContent = (despues - antes).toFixed(0) + ' unidades';
+    el.style.color = 'var(--green)';
+  } else {
+    el.textContent = '—';
+    el.style.color = 'var(--cyan)';
+  }
+}
+
+async function guardarCargaTanque() {
+  const chofer = document.getElementById('c-chofer').value.trim();
+  const patente = document.getElementById('c-patente').value.trim();
+  const antes = document.getElementById('c-antes').value.trim();
+  const despues = document.getElementById('c-despues').value.trim();
+  const remito = document.getElementById('c-remito').value.trim();
+  if (!chofer || !patente || !antes || !despues || !remito) {
+    mostrarGasMsg('warning','⚠ Completar todos los campos obligatorios (*)'); return;
+  }
+  const cargado = parseFloat(despues) - parseFloat(antes);
+
+  const btn = document.querySelector("button[onclick='guardarCargaTanque()']");
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+  const res = await api({
+    action: 'registrarCargaTanque',
+    operario: state.nombre,
+    chofer, patente,
+    nivelAntes: antes,
+    nivelDespues: despues,
+    cantidadCargada: cargado.toFixed(0),
+    remito,
+    observaciones: document.getElementById('c-obs').value,
+  });
+
+  if (btn) { btn.disabled = false; btn.innerHTML = '💾 Registrar carga de tanque'; }
+
+  if (res && res.ok !== false) {
+    mostrarGasMsg('success',
+      \`✓ Carga registrada. Cantidad: \${cargado.toFixed(0)} unidades · Remito: \${remito}\n⚠ Recordar entregar el remito físico al Jefe de Mantenimiento.\`);
+    ['c-chofer','c-patente','c-antes','c-despues','c-remito','c-obs'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    document.getElementById('c-cargado').textContent = '—';
+  } else {
+    mostrarGasMsg('danger', '✗ Error: ' + (res?.error || 'verificar conexión'));
+  }
+}
+
+// ── STOCK ACTUAL ──────────────────────────────────────────────
+async function renderGasStock(c) {
+  c.innerHTML = '<div class="text-muted">Cargando stock...</div>';
+  const data = await api({ action: 'getStockGas' });
+
+  const stock = data && data.ok !== false && data.stock ? data.stock : {
+    'Oxígeno medicinal': '—', 'Aire comprimido': '—', 'CO2': '—', 'Oxígeno transporte (camillero)': '—'
+  };
+  const ultimaRonda = data && data.ultimaRonda ? data.ultimaRonda : null;
+
+  const items = Object.entries(STOCK_MINIMO).map(([tipo, minimo]) => {
+    const cant = parseInt(stock[tipo]) || 0;
+    const ok = !isNaN(cant) && cant >= minimo;
+    const badge = isNaN(cant) ? 'badge-info' : ok ? 'badge-done' : 'badge-urgent';
+    const label = isNaN(cant) ? 'Sin datos' : ok ? 'OK' : 'BAJO';
+    return { tipo, cant, minimo, badge, label, ok };
+  });
+
+  const hayBajos = items.some(i => !i.ok && !isNaN(i.cant));
+
+  c.innerHTML = \`
+    \${hayBajos ? \`<div class="alert alert-warning mb-16">⚠ Hay gases por debajo del stock mínimo.
+      <a href="mailto:\${EMAIL_CASCIA}?subject=Solicitud%20de%20reposici%C3%B3n%20de%20tubos&body=Estimado%20equipo%20CASCIA%2C%0A%0ASe%20solicita%20la%20reposici%C3%B3n%20de%20gases.%0A%0AQuedamos%20a%20disposici%C3%B3n.%0A%0ASanatorio%20San%20Jos%C3%A9%0AMantenimiento&reply-to=\${EMAIL_RESPUESTA}"
+        class="btn btn-warning btn-sm" style="margin-left:12px" target="_blank">📧 Enviar correo a CASCIA</a>
+    </div>` : ''}
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">📦 Stock de tubos</div>
+        \${ultimaRonda ? \`<div style="font-size:11px;color:var(--text2);margin-bottom:12px">Última ronda: \${ultimaRonda}</div>\` : ''}
+        <table style="width:100%;font-size:13px">
+          <thead><tr>
+            <th style="text-align:left;padding:8px 6px;font-size:11px;color:var(--text2);text-transform:uppercase">Gas</th>
+            <th style="text-align:center;padding:8px 6px;font-size:11px;color:var(--text2);text-transform:uppercase">Actual</th>
+            <th style="text-align:center;padding:8px 6px;font-size:11px;color:var(--text2);text-transform:uppercase">Mínimo</th>
+            <th style="text-align:center;padding:8px 6px;font-size:11px;color:var(--text2);text-transform:uppercase">Estado</th>
+          </tr></thead>
+          <tbody>\${items.map(i => \`<tr>
+            <td style="padding:10px 6px"><strong>\${i.tipo}</strong></td>
+            <td style="text-align:center;font-family:var(--mono);font-size:18px;padding:10px 6px;color:\${i.ok?'var(--green)':'var(--red)'}">\${isNaN(parseInt(stock[i.tipo]))?'—':i.cant}</td>
+            <td style="text-align:center;font-family:var(--mono);padding:10px 6px;color:var(--text2)">\${i.minimo}</td>
+            <td style="text-align:center;padding:10px 6px"><span class="badge \${i.badge}">\${i.label}</span></td>
+          </tr>\`).join('')}</tbody>
+        </table>
+      </div>
+      <div class="card" id="gas-historial-rondas">
+        <div class="card-title">📈 Últimas lecturas del tanque</div>
+        <div class="text-muted">Cargando...</div>
+      </div>
+    </div>\`;
+  cargarHistorialRondasGas();
+}
+
+async function cargarHistorialRondasGas() {
+  const el = document.getElementById('gas-historial-rondas');
+  if (!el) return;
+  const data = await api({ action: 'getRondasGas' });
+  const items = Array.isArray(data) ? data.slice(-7).reverse() : [];
+  el.innerHTML = '<div class="card-title">📈 Últimas lecturas del tanque</div>' +
+    (items.length === 0 ? '<div class="text-muted">Sin lecturas registradas.</div>' :
+    items.map(r => \`
+      <div style="padding:8px 0;border-bottom:1px solid rgba(45,125,210,.08);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:12px;color:var(--text2)">\${r.Fecha||''} \${r.Hora||''} · \${r.Operario||''}</div>
+          \${r.Observaciones ? \`<div style="font-size:11px;color:var(--text3);margin-top:1px">\${r.Observaciones}</div>\` : ''}
+        </div>
+        <div style="font-family:var(--mono);font-size:22px;color:var(--cyan);margin-left:12px">\${r.NivelTanque||'—'}</div>
+      </div>\`).join(''));
+}
+
+function mostrarGasMsg(tipo, texto) {
+  const el = document.getElementById('gas-msg');
+  if (!el) return;
+  el.innerHTML = \`<div class="alert alert-\${tipo}" style="max-width:580px;white-space:pre-line">\${texto}</div>\`;
+  if (tipo === 'success') setTimeout(() => { el.innerHTML = ''; }, 6000);
 }
 
 // ── DASHBOARD ────────────────────────────────────────────────
