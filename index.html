@@ -716,12 +716,28 @@ function buildNav() {
 
   if (r === "director") {
     sections.push({
-      label: "Consultas",
+      label: "Operaciones",
       items: [
         { id:"dashboard", icon:"📊", label:"Dashboard" },
+        { id:"cola", icon:"📥", label:"Cola de pedidos", badge:"pedidos" },
+        { id:"novedades", icon:"📝", label:"Novedades de turno" },
+        { id:"oxigeno", icon:"🫧", label:"Gestión de gases" },
+      ]
+    });
+    sections.push({
+      label: "Pedidos",
+      items: [
+        { id:"pedido_supervisor", icon:"➕", label:"Crear pedido de trabajo" },
+      ]
+    });
+    sections.push({
+      label: "Consultas (solo lectura)",
+      items: [
         { id:"personal", icon:"👥", label:"Nómina personal" },
+        { id:"req_personal_admin", icon:"📅", label:"Solicitudes del personal" },
         { id:"proveedores", icon:"📞", label:"Proveedores" },
         { id:"obleas", icon:"🏷", label:"Obleas / venc." },
+        { id:"servicios_admin", icon:"🔑", label:"Servicios / PINs" },
       ]
     });
   }
@@ -2024,10 +2040,10 @@ async function enviarRonda() {
 
 // ── PERSONAL ─────────────────────────────────────────────────
 async function renderPersonal() {
-  document.getElementById("content").innerHTML = `
+  document.getElementById("content").innerHTML = soloLecturaDirector() + `
     <div class="section-header">
       <div><div class="section-title">Nómina del personal de mantenimiento</div></div>
-      ${state.role==="director"?"":"<button class='btn btn-primary btn-sm' onclick='abrirModalPersonal()'>+ Agregar</button>"}
+      ${(state.role==="director")?"<span class='badge badge-info'>Solo lectura</span>":"<button class='btn btn-primary btn-sm' onclick='abrirModalPersonal()'>+ Agregar</button>"}
     </div>
     <div id="personal-table"><div class="text-muted">Cargando...</div></div>`;
 
@@ -2060,7 +2076,7 @@ async function renderProveedores() {
   document.getElementById("content").innerHTML = `
     <div class="section-header">
       <div><div class="section-title">Proveedores y servicios tercerizados</div></div>
-      <button class="btn btn-primary btn-sm" onclick="abrirModalProveedor()">+ Agregar</button>
+      ${state.role==="director" ? "<span class='badge badge-info'>Solo lectura</span>" : "<button class='btn btn-primary btn-sm' onclick='abrirModalProveedor()'>+ Agregar</button>"}
     </div>
     <div id="prov-table"><div class="text-muted">Cargando...</div></div>`;
 
@@ -2266,6 +2282,14 @@ async function respReq(id, estado) {
   const resp = estado==="Rechazado" ? prompt("Motivo del rechazo (opcional):") || "" : "";
   const res = await api({ action:"responderRequerimiento", id, estado, respuesta:resp });
   if (res && res.ok !== false) { showAlert("success","✓ Requerimiento "+estado.toLowerCase()); renderReqPersonalAdmin(); }
+}
+
+// ── READONLY BANNER ──────────────────────────────────────────
+function soloLecturaDirector() {
+  if (state.role !== "director") return "";
+  return `<div class="alert alert-info mb-16" style="max-width:100%">
+    👁 Modo solo lectura — Dirección. Podés ver toda la información pero no modificar datos del sistema.
+  </div>`;
 }
 
 // ── INIT ─────────────────────────────────────────────────────
