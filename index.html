@@ -720,18 +720,20 @@ function buildNav() {
       items: [
         { id:"dashboard", icon:"📊", label:"Dashboard" },
         { id:"cola", icon:"📥", label:"Cola de pedidos", badge:"pedidos" },
+        { id:"ronda", icon:"🚶", label:"Realizar ronda" },
         { id:"novedades", icon:"📝", label:"Novedades de turno" },
         { id:"oxigeno", icon:"🫧", label:"Gestión de gases" },
       ]
     });
     sections.push({
-      label: "Pedidos",
+      label: "Dirección",
       items: [
         { id:"pedido_supervisor", icon:"➕", label:"Crear pedido de trabajo" },
+        { id:"tablero_supervisor", icon:"📌", label:"Tablero de novedades" },
       ]
     });
     sections.push({
-      label: "Consultas (solo lectura)",
+      label: "Consultas — Solo lectura",
       items: [
         { id:"personal", icon:"👥", label:"Nómina personal" },
         { id:"req_personal_admin", icon:"📅", label:"Solicitudes del personal" },
@@ -818,13 +820,24 @@ function showAlert(type, msg, container="content") {
 
 // ── TABLERO SUPERVISOR ───────────────────────────────────────
 async function renderTableroSupervisor() {
-  document.getElementById("content").innerHTML = `
+  const esSoloLectura = state.role === "director";
+  document.getElementById("content").innerHTML = soloLecturaDirector() + `
     <div class="section-header">
       <div><div class="section-title">Tablero de novedades</div>
-      <div class="section-sub">Lo que publiques acá lo ven todos los operarios al entrar</div></div>
+      <div class="section-sub">${esSoloLectura ? "Novedades publicadas por el Jefe de Mantenimiento" : "Lo que publiques acá lo ven todos los operarios al entrar"}</div></div>
     </div>
-    <div class="grid-2">
-      <div class="card">
+    <div class="${esSoloLectura ? "" : "grid-2"}">
+      ${esSoloLectura ? "" : `<div class="card">
+        <div class="card-title">📌 Publicar novedad</div>
+        <div id="tablero-msg"></div>`}`;
+  if (esSoloLectura) {
+    // Solo mostrar el listado
+    document.getElementById("content").innerHTML += `<div class="card" id="tablero-lista"><div class="card-title">Novedades publicadas</div><div class="text-muted">Cargando...</div></div>`;
+    cargarTablero();
+    return;
+  }
+  document.getElementById("content").innerHTML += `
+        <div class="card">
         <div class="card-title">📌 Publicar novedad</div>
         <div id="tablero-msg"></div>
         <div class="form-group">
