@@ -653,6 +653,11 @@ function launchApp() {
   if (state.role === "operario" || state.role === "supervisor") {
     initNotifications();
   }
+  // Pre-cargar voces para texto a voz (Android Chrome las carga async)
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+  }
   navigate("dashboard");
 }
 
@@ -1679,6 +1684,29 @@ function mostrarMsgPedido(tipo, texto) {
   if (tipo === "success") setTimeout(() => { el.innerHTML = ""; }, 5000);
 }
 
+// ── TEXTO A VOZ ──────────────────────────────────────────────
+function leerPedido(servicio, descripcion, urgencia) {
+  if (!('speechSynthesis' in window)) {
+    alert("Tu navegador no soporta texto a voz. Usá Chrome.");
+    return;
+  }
+  window.speechSynthesis.cancel(); // detener si hay algo leyendo
+  const texto = "Pedido de " + servicio + ". Urgencia " + urgencia + ". " + descripcion;
+  const msg = new SpeechSynthesisUtterance(texto);
+  msg.lang = "es-AR";
+  msg.rate = 0.9;
+  msg.pitch = 1;
+  // Buscar voz en español
+  const voces = window.speechSynthesis.getVoices();
+  const vozEsp = voces.find(v => v.lang.startsWith("es")) || voces[0];
+  if (vozEsp) msg.voice = vozEsp;
+  window.speechSynthesis.speak(msg);
+}
+
+function detenerAudio() {
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+}
+
 // ── COLA DE PEDIDOS (OPERARIOS) ──────────────────────────────
 async function renderCola() {
   document.getElementById("content").innerHTML = `
@@ -1714,9 +1742,12 @@ async function renderCola() {
           <td><span class="badge ${badgeClass(p.Estado)}">${p.Estado||""}</span></td>
           <td style="font-size:12px">${p.OperarioAsignado||"—"}</td>
           <td style="white-space:nowrap">
+            <button class="btn btn-ghost btn-sm" style="margin-bottom:4px;width:100%" 
+              onclick="leerPedido('${p.Servicio||""}','${(p.Descripcion||"").replace(/'/g,"").substring(0,120)}','${p.Urgencia||""}')"
+              title="Escuchar pedido">🔊 Escuchar</button>
             ${p.Estado==="Pendiente" ? `
               <button class="btn btn-primary btn-sm" onclick="asumir('${p.ID}')">Asumir</button>
-              <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="rechazarPedidoModal('${p.ID}','${(p.Descripcion||"").substring(0,30)}')">⚠ Sin capacidad operativa</button>
+              <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="rechazarPedidoModal('${p.ID}','${(p.Descripcion||"").substring(0,30)}')">⚠ Sin cap.</button>
             ` : ""}
             ${p.Estado==="En curso" ? `
               <button class="btn btn-success btn-sm" onclick="cerrarPedidoModal('${p.ID}')">Cerrar</button>
@@ -1728,9 +1759,64 @@ async function renderCola() {
 }
 
 async function asumir(id) {
+  const btn = document.querySelector(`button[onclick="asumir('${id}')"]`);
+  if (btn) { btn.disabled = true; btn.textContent = "Asumiendo..."; }
+
   const res = await api({ action:"asignarPedido", id, operario: state.nombre });
-  if (res && res.ok !== false) { showAlert("success","✓ Trabajo asumido"); renderCola(); }
-  else showAlert("danger","Error: " + (res?.error||""));
+
+  if (res && res.ok !== false) {
+    // Buscar datos del pedido en la lista actual para mostrar en el modal
+    const fila = document.querySelector(`button[onclick="asumir('${id}')"]`)?.closest("tr");
+    const celdas = fila ? fila.querySelectorAll("td") : [];
+    const servicio = celdas[1]?.textContent || "";
+    const desc = celdas[3]?.textContent || "";
+
+    // Abrir modal de observación inmediatamente sin recargar la cola
+    abrirObsPostAsumir(id, servicio, desc);
+  } else {
+    if (btn) { btn.disabled = false; btn.textContent = "Asumir"; }
+    showAlert("danger","Error al asumir: " + (res?.error||""));
+  }
+}
+
+function abrirObsPostAsumir(id, servicio, desc) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-title">✓ Trabajo asumido</div>
+      <div class="alert alert-success mb-16">El trabajo quedó registrado a tu nombre.</div>
+      ${servicio ? `<div style="font-size:12px;color:var(--text2);margin-bottom:4px">Servicio: <strong>${servicio}</strong></div>` : ""}
+      ${desc ? `<div style="font-size:13px;margin-bottom:16px">${desc}</div>` : ""}
+      <div class="form-group">
+        <label class="form-label">Observación inicial (opcional)</label>
+        <textarea id="obs-post-asumir" placeholder="Ej: Me dirijo al sector. / Requiero insumos antes de resolver. / Inicio evaluación del problema..." style="min-height:90px"></textarea>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px">Si no tenés observaciones por ahora, podés cerrar sin completar este campo.</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="cerrarObsPostAsumir(this)">Cerrar sin observación</button>
+        <button class="btn btn-primary" onclick="guardarObsPostAsumir('${id}', this)">💾 Guardar observación</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+function cerrarObsPostAsumir(btn) {
+  btn.closest(".modal-overlay").remove();
+  renderCola();
+}
+
+async function guardarObsPostAsumir(id, btn) {
+  const texto = document.getElementById("obs-post-asumir").value.trim();
+  if (texto) {
+    const ahora = new Date().toLocaleTimeString("es-AR", {hour:"2-digit", minute:"2-digit"});
+    await api({
+      action: "agregarObservacion", id,
+      observacion: "[" + ahora + " - " + state.nombre + "] " + texto
+    });
+  }
+  btn.closest(".modal-overlay").remove();
+  renderCola();
 }
 
 function cerrarPedidoModal(id) {
