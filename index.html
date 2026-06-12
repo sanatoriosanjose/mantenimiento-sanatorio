@@ -1714,6 +1714,25 @@ async function renderCola() {
       <div><div class="section-title">Cola de pedidos</div><div class="section-sub">Pedidos pendientes y en curso</div></div>
       <button class="btn btn-ghost btn-sm" onclick="renderCola()">↻ Actualizar</button>
     </div>
+    <div class="flex-row mb-16" style="gap:12px;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <div class="form-label" style="margin-bottom:4px">Filtrar por estado</div>
+        <select id="filtro-estado" onchange="filtrarCola()" style="width:180px;padding:7px 10px">
+          <option value="">Todos</option>
+          <option value="Pendiente">Pendiente</option>
+          <option value="En curso">En curso</option>
+          <option value="Sin cap. operativa">Sin cap. operativa</option>
+        </select>
+      </div>
+      <div>
+        <div class="form-label" style="margin-bottom:4px">Filtrar por operario</div>
+        <select id="filtro-operario" onchange="filtrarCola()" style="width:200px;padding:7px 10px">
+          <option value="">Todos</option>
+          <option value="${state.nombre}">Mis trabajos (${state.nombre})</option>
+        </select>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="limpiarFiltrosCola()" style="margin-top:18px">✕ Limpiar filtros</button>
+    </div>
     <div id="cola-content"><div class="text-muted">Cargando...</div></div>`;
 
   const pedidos = await api({ action:"getPedidos" });
@@ -1728,8 +1747,45 @@ async function renderCola() {
   const badge = document.getElementById("badge-pedidos");
   if(badge) badge.textContent = activos.filter(p=>p.Estado==="Pendiente").length;
 
+  // Poblar selector de operarios con los que tienen trabajos asignados
+  const operariosFiltro = document.getElementById("filtro-operario");
+  if (operariosFiltro) {
+    const operariosConTrabajo = [...new Set(activos.filter(p=>p.OperarioAsignado).map(p=>p.OperarioAsignado))];
+    operariosConTrabajo.forEach(op => {
+      if (op !== state.nombre && !operariosFiltro.querySelector(`option[value="${op}"]`)) {
+        const opt = document.createElement("option");
+        opt.value = op; opt.textContent = op;
+        operariosFiltro.appendChild(opt);
+      }
+    });
+  }
+
+  // Guardar datos globalmente para filtrar sin recargar
+  window._colaData = activos;
+  renderFilaCola(activos);
+}
+
+function filtrarCola() {
+  if (!window._colaData) return;
+  const estado = document.getElementById("filtro-estado")?.value || "";
+  const operario = document.getElementById("filtro-operario")?.value || "";
+  let filtrados = window._colaData;
+  if (estado) filtrados = filtrados.filter(p => p.Estado === estado);
+  if (operario) filtrados = filtrados.filter(p => p.OperarioAsignado === operario);
+  renderFilaCola(filtrados);
+}
+
+function limpiarFiltrosCola() {
+  const fe = document.getElementById("filtro-estado");
+  const fo = document.getElementById("filtro-operario");
+  if (fe) fe.value = "";
+  if (fo) fo.value = "";
+  filtrarCola();
+}
+
+function renderFilaCola(activos) {
   document.getElementById("cola-content").innerHTML = activos.length === 0
-    ? `<div class="alert alert-success">✓ No hay pedidos pendientes.</div>`
+    ? `<div class="alert alert-info">No hay pedidos que coincidan con los filtros aplicados.</div>`
     : `<div class="tbl-wrap"><table>
       <thead><tr><th>ID</th><th>Servicio</th><th>Solicitante</th><th>Descripción</th><th>Urgencia</th><th>Estado</th><th>Asignado a</th><th>Acciones</th></tr></thead>
       <tbody>${activos.map(p=>`
