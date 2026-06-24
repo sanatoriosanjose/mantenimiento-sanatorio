@@ -2038,26 +2038,26 @@ async function renderMisPedidos() {
           } catch(e) {}
         }
         const estadoColor = p.Estado==="Resuelto" ? "var(--green)" : p.Estado==="En curso" ? "var(--blue)" : "var(--amber)";
-        return \`<tr>
-          <td class="text-mono" style="font-size:11px;color:var(--text2)">\${p.ID||"—"}</td>
+        return `<tr>
+          <td class="text-mono" style="font-size:11px;color:var(--text2)">${p.ID||"—"}</td>
           <td style="font-size:12px;white-space:nowrap">
-            <div>\${p.Fecha||"—"}</div>
-            <div style="color:var(--text2)">\${p.Hora||"—"}</div>
+            <div>${p.Fecha||"—"}</div>
+            <div style="color:var(--text2)">${p.Hora||"—"}</div>
           </td>
-          <td style="font-size:12px;max-width:180px">\${p.Descripcion||""}</td>
-          <td><span class="badge \${badgeClass(p.Urgencia)}">\${p.Urgencia||""}</span></td>
-          <td><span class="badge \${badgeClass(p.Estado)}" style="white-space:nowrap">\${p.Estado||""}</span></td>
-          <td style="font-size:12px">\${p.OperarioAsignado||"—"}</td>
-          <td style="font-size:12px;white-space:nowrap;color:\${p.FechaCierre?"var(--green)":"var(--text2)"}">
-            \${p.FechaCierre ? p.FechaCierre.replace(" ","<br>") : "—"}
+          <td style="font-size:12px;max-width:180px">${p.Descripcion||""}</td>
+          <td><span class="badge ${badgeClass(p.Urgencia)}">${p.Urgencia||""}</span></td>
+          <td><span class="badge ${badgeClass(p.Estado)}" style="white-space:nowrap">${p.Estado||""}</span></td>
+          <td style="font-size:12px">${p.OperarioAsignado||"—"}</td>
+          <td style="font-size:12px;white-space:nowrap;color:${p.FechaCierre?"var(--green)":"var(--text2)"}">
+            ${p.FechaCierre ? p.FechaCierre.replace(" ","<br>") : "—"}
           </td>
-          <td style="font-size:12px;font-family:var(--mono);color:\${tiempoTexto==="—"?"var(--text3)":tiempoTexto.includes("d")?"var(--red)":"var(--cyan)"}">
-            \${tiempoTexto}
+          <td style="font-size:12px;font-family:var(--mono);color:${tiempoTexto==="—"?"var(--text3)":tiempoTexto.includes("d")?"var(--red)":"var(--cyan)"}">
+            ${tiempoTexto}
           </td>
           <td style="font-size:12px;max-width:200px;color:var(--text2)">
-            \${p.Observaciones ? \`<div style="background:var(--navy3);border-left:3px solid var(--cyan);padding:6px 8px;border-radius:0 4px 4px 0;font-size:11px">\${p.Observaciones}</div>\` : "—"}
+            ${p.Observaciones ? `<div style="background:var(--navy3);border-left:3px solid var(--cyan);padding:6px 8px;border-radius:0 4px 4px 0;font-size:11px">${p.Observaciones}</div>` : "—"}
           </td>
-        </tr>\`;
+        </tr>`;
       }).join("")}</tbody></table></div>`;
 }
 
