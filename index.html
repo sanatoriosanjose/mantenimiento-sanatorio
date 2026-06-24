@@ -2006,14 +2006,59 @@ async function renderMisPedidos() {
   document.getElementById("mis-pedidos-content").innerHTML = data.length===0
     ? `<div class="text-muted">No hay pedidos registrados para este servicio.</div>`
     : `<div class="tbl-wrap"><table>
-      <thead><tr><th>Fecha</th><th>Hora</th><th>Descripción</th><th>Urgencia</th><th>Estado</th><th>Asignado a</th></tr></thead>
-      <tbody>${data.map(p=>`<tr>
-        <td>${p.Fecha}</td><td>${p.Hora}</td>
-        <td style="font-size:12px">${p.Descripcion}</td>
-        <td><span class="badge ${badgeClass(p.Urgencia)}">${p.Urgencia}</span></td>
-        <td><span class="badge ${badgeClass(p.Estado)}">${p.Estado}</span></td>
-        <td>${p.OperarioAsignado||"—"}</td>
-      </tr>`).join("")}</tbody></table></div>`;
+      <thead><tr>
+        <th>N° Pedido</th>
+        <th>Solicitado</th>
+        <th>Descripción</th>
+        <th>Urgencia</th>
+        <th>Estado</th>
+        <th>Operario</th>
+        <th>Resuelto</th>
+        <th>Tiempo</th>
+        <th>Novedades de mantenimiento</th>
+      </tr></thead>
+      <tbody>${data.map(p => {
+        // Calcular tiempo de resolución
+        let tiempoTexto = "—";
+        if (p.FechaCierre && p.Fecha && p.Hora) {
+          try {
+            const partesFecha = p.Fecha.split("/");
+            const inicio = new Date(partesFecha[2], partesFecha[1]-1, partesFecha[0],
+              parseInt(p.Hora.split(":")[0]), parseInt(p.Hora.split(":")[1]));
+            const partCierre = p.FechaCierre.split(" ");
+            const pf = partCierre[0].split("/");
+            const ph = (partCierre[1]||"00:00").split(":");
+            const cierre = new Date(pf[2], pf[1]-1, pf[0], parseInt(ph[0]), parseInt(ph[1]));
+            const diff = Math.floor((cierre - inicio) / 60000);
+            if (diff >= 0) {
+              if (diff < 60) tiempoTexto = diff + " min";
+              else if (diff < 1440) tiempoTexto = Math.floor(diff/60) + "h " + (diff%60) + "m";
+              else tiempoTexto = Math.floor(diff/1440) + "d " + Math.floor((diff%1440)/60) + "h";
+            }
+          } catch(e) {}
+        }
+        const estadoColor = p.Estado==="Resuelto" ? "var(--green)" : p.Estado==="En curso" ? "var(--blue)" : "var(--amber)";
+        return \`<tr>
+          <td class="text-mono" style="font-size:11px;color:var(--text2)">\${p.ID||"—"}</td>
+          <td style="font-size:12px;white-space:nowrap">
+            <div>\${p.Fecha||"—"}</div>
+            <div style="color:var(--text2)">\${p.Hora||"—"}</div>
+          </td>
+          <td style="font-size:12px;max-width:180px">\${p.Descripcion||""}</td>
+          <td><span class="badge \${badgeClass(p.Urgencia)}">\${p.Urgencia||""}</span></td>
+          <td><span class="badge \${badgeClass(p.Estado)}" style="white-space:nowrap">\${p.Estado||""}</span></td>
+          <td style="font-size:12px">\${p.OperarioAsignado||"—"}</td>
+          <td style="font-size:12px;white-space:nowrap;color:\${p.FechaCierre?"var(--green)":"var(--text2)"}">
+            \${p.FechaCierre ? p.FechaCierre.replace(" ","<br>") : "—"}
+          </td>
+          <td style="font-size:12px;font-family:var(--mono);color:\${tiempoTexto==="—"?"var(--text3)":tiempoTexto.includes("d")?"var(--red)":"var(--cyan)"}">
+            \${tiempoTexto}
+          </td>
+          <td style="font-size:12px;max-width:200px;color:var(--text2)">
+            \${p.Observaciones ? \`<div style="background:var(--navy3);border-left:3px solid var(--cyan);padding:6px 8px;border-radius:0 4px 4px 0;font-size:11px">\${p.Observaciones}</div>\` : "—"}
+          </td>
+        </tr>\`;
+      }).join("")}</tbody></table></div>`;
 }
 
 // ── TRABAJO PROPIO ───────────────────────────────────────────
