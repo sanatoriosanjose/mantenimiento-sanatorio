@@ -909,8 +909,23 @@ async function cargarTablero() {
   const lista = document.getElementById("tablero-lista");
   if (!lista) return;
   const data = await api({ action:"getNovedades" });
+  const hoy = new Date();
+  hoy.setHours(0,0,0,0);
+
   const items = Array.isArray(data)
-    ? data.filter(n => n.Turno === "Jefe de Mantenimiento").reverse()
+    ? data.filter(n => {
+        if (n.Turno !== "Jefe de Mantenimiento") return false;
+        // Verificar vigencia si tiene fecha definida
+        const tipoStr = n.Tipo || "";
+        if (tipoStr.includes("Vigente hasta:")) {
+          const partes = tipoStr.split("Vigente hasta:")[1].trim();
+          // Formato puede ser yyyy-mm-dd (del input date)
+          const fechaVig = new Date(partes);
+          fechaVig.setHours(23,59,59,0);
+          if (!isNaN(fechaVig.getTime()) && fechaVig < hoy) return false;
+        }
+        return true;
+      }).reverse()
     : [];
 
   const iconos = { "Instrucción":"📋","Alerta":"🔴","Información":"ℹ️","Recordatorio":"🔔","Urgente":"🚨" };
@@ -1547,7 +1562,18 @@ async function renderDashboard() {
   // Novedades del supervisor (tablero) — se muestran primero y destacadas
   if (novedades && Array.isArray(novedades)) {
     const strip = document.getElementById("novedades-strip");
-    const deSuper = novedades.filter(n => n.Turno === "Jefe de Mantenimiento").slice(-3).reverse();
+    const hoyFiltro = new Date(); hoyFiltro.setHours(0,0,0,0);
+    const deSuper = novedades.filter(n => {
+      if (n.Turno !== "Jefe de Mantenimiento") return false;
+      const tipoStr = n.Tipo || "";
+      if (tipoStr.includes("Vigente hasta:")) {
+        const partes = tipoStr.split("Vigente hasta:")[1].trim();
+        const fechaVig = new Date(partes);
+        fechaVig.setHours(23,59,59,0);
+        if (!isNaN(fechaVig.getTime()) && fechaVig < hoyFiltro) return false;
+      }
+      return true;
+    }).slice(-3).reverse();
     const deOperarios = novedades.filter(n => n.Turno !== "Jefe de Mantenimiento").slice(-3).reverse();
     let html = "";
 
